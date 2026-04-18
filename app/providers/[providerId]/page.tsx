@@ -1,0 +1,93 @@
+import { notFound } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { createBookingAction } from "@/app/providers/[providerId]/actions";
+import { formatServices } from "@/lib/utils";
+
+type ProviderProfilePageProps = {
+  params: Promise<{
+    providerId: string;
+  }>;
+  searchParams: Promise<{
+    error?: string;
+  }>;
+};
+
+export default async function ProviderProfilePage({ params, searchParams }: ProviderProfilePageProps) {
+  const { providerId } = await params;
+  const search = await searchParams;
+  const supabase = await createClient();
+  const { data: provider } = await supabase
+    .from("provider_profiles")
+    .select("*, profiles(full_name)")
+    .eq("user_id", providerId)
+    .eq("approval_status", "approved")
+    .single();
+
+  if (!provider) {
+    notFound();
+  }
+
+  return (
+    <section className="section">
+      <div className="dashboard-grid">
+        <article className="card stack-md">
+          <div className="eyebrow">Provider profile</div>
+          <h1 style={{ margin: 0 }}>{provider.business_name}</h1>
+          <p className="muted">{provider.location}</p>
+          <p>{provider.bio || "This provider is available for automotive bookings."}</p>
+          <div className="pill-list">
+            {provider.services.map((item: string) => (
+              <span key={item} className="pill">
+                {item}
+              </span>
+            ))}
+          </div>
+          <div className="stack-sm">
+            <span>Contact person: {provider.profiles?.full_name}</span>
+            <span>Phone: {provider.contact_phone}</span>
+            <span>Email: {provider.contact_email}</span>
+            <span>Services: {formatServices(provider.services)}</span>
+          </div>
+        </article>
+
+        <aside className="card stack-md">
+          <div className="eyebrow">3-step booking flow</div>
+          <div className="booking-steps">
+            <div className="step">
+              <strong>1. Review provider details</strong>
+              <p className="muted">Confirm location, service type, and contact details.</p>
+            </div>
+            <div className="step">
+              <strong>2. Select a date</strong>
+              <p className="muted">Choose the day you want the inspection or repair.</p>
+            </div>
+            <div className="step">
+              <strong>3. Describe the issue</strong>
+              <p className="muted">Add enough context so the provider can prepare.</p>
+            </div>
+          </div>
+
+          {search.error ? (
+            <div className="card">
+              <strong>Unable to place booking</strong>
+              <p className="muted">{search.error}</p>
+            </div>
+          ) : null}
+
+          <form action={createBookingAction} className="stack-md">
+            <input type="hidden" name="providerId" value={providerId} />
+            <input type="date" name="appointmentDate" required />
+            <textarea
+              name="issueDescription"
+              placeholder="Describe the car issue, warning lights, sounds, or repair needed"
+              required
+            />
+            <button className="button-primary" type="submit">
+              Submit booking request
+            </button>
+          </form>
+        </aside>
+      </div>
+    </section>
+  );
+}
