@@ -11,7 +11,6 @@ export async function Header() {
       <nav className="nav-links">
   <Link href="/customer">Customer</Link>
   <Link href="/provider">Provider dashboard</Link>
-  <Link href="/admin">Admin</Link>
   <HeaderAuth />
 </nav>
     </header>

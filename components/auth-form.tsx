@@ -37,21 +37,10 @@ export function AuthForm() {
       return;
     }
 
-    // Skip auto login, go to login page
-setMode("login");
-setError("Account created successfully. Please log in.");
-return;
-
-    if (signInError) {
-      setError("Account created, but sign-in failed. Please log in manually.");
-      setMode("login");
-      return;
-    }
-
     const { data: authState } = await supabase.auth.getUser();
 
     if (!authState.user) {
-      setError("Signed in, but no active session was found.");
+      setError("Account created, but no session found.");
       return;
     }
 
@@ -68,22 +57,21 @@ return;
       return;
     }
 
-    if (role === "provider") {
-      const { error: providerError } = await supabase.from("provider_profiles").upsert({
-        user_id: authState.user.id,
-        business_name: fullName,
-        services: ["Mechanic"],
-        location: "",
-        contact_email: email,
-        contact_phone: phone,
-        bio: "",
-        approval_status: "pending"
+    // ✅ AUTO-COMPLETE BOOKING IF EXISTS
+    const draft = localStorage.getItem("bookingDraft");
+
+    if (draft) {
+      const booking = JSON.parse(draft);
+
+      await fetch("/api/create-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(booking)
       });
 
-      if (providerError) {
-        setError(providerError.message);
-        return;
-      }
+      localStorage.removeItem("bookingDraft");
     }
 
     const nextPath = redirectForRole(role);
@@ -97,53 +85,46 @@ return;
 
     setError(null);
 
-    const { error: loginError } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
     });
 
-    if (loginError) {
-      setError(loginError.message);
+    if (error || !data.user) {
+      setError(error?.message ?? "Unable to sign in.");
       return;
     }
 
-    const {
-      data: { user }
-    } = await supabase.auth.getUser();
-
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile } = await supabase
       .from("profiles")
       .select("role")
-      .eq("id", user?.id)
+      .eq("id", data.user.id)
       .single();
 
-    if (profileError || !profile) {
-      setError(profileError?.message ?? "Profile not found for this account.");
+    if (!profile) {
+      setError("Profile not found for this account.");
       return;
+    }
+
+    // ✅ AUTO-COMPLETE BOOKING IF EXISTS
+    const draft = localStorage.getItem("bookingDraft");
+
+    if (draft) {
+      const booking = JSON.parse(draft);
+
+      await fetch("/api/create-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(booking)
+      });
+
+      localStorage.removeItem("bookingDraft");
     }
 
     const nextPath = redirectForRole(profile.role);
-    router.replace(nextPath);
-    router.refresh();
-    window.location.assign(nextPath);
-  }
-
-  function onSignupSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-
-    startTransition(async () => {
-      await handleSignup(formData);
-    });
-  }
-
-  function onLoginSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-
-    startTransition(async () => {
-      await handleLogin(formData);
-    });
+    router.push(nextPath);
   }
 
   return (
@@ -165,7 +146,7 @@ return;
       ) : null}
 
       {mode === "signup" ? (
-        <form onSubmit={onSignupSubmit} className="stack-md">
+        <form action={handleSignup} className="stack-md">
           <input name="fullName" placeholder="Full name" required />
           <input name="phone" placeholder="Phone number" required />
           <input name="email" type="email" placeholder="Email address" required />
@@ -179,7 +160,7 @@ return;
           </button>
         </form>
       ) : (
-        <form onSubmit={onLoginSubmit} className="stack-md">
+        <form action={handleLogin} className="stack-md">
           <input name="email" type="email" placeholder="Email address" required />
           <input name="password" type="password" placeholder="Password" minLength={6} required />
           <button className="button-primary" type="submit" disabled={isPending}>

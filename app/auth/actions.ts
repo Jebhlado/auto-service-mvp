@@ -64,7 +64,11 @@ export async function signupAction(formData: FormData) {
     );
   }
 
-  redirect(normalizeRedirectForRole(role));
+  if (role === "provider") {
+  redirect("/complete-provider-profile");
+}
+
+redirect("/customer");
 }
 
 export async function loginAction(formData: FormData) {

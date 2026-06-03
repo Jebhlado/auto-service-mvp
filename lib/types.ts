@@ -44,4 +44,6 @@ export type BookingRecord = {
     business_name: string;
     location: string;
   } | null;
+  service_preference?: string | null;
+attachment_url?: string | null;
 };
