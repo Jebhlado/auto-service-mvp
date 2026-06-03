@@ -34,9 +34,9 @@ export default function CompleteProviderProfile() {
       })
       .eq('user_id', user.id)
 
-    if (!error) {
-      router.push('/provider')
-    }
+   if (!error) {
+  router.push('/provider/submitted')
+
   }
 
   return (

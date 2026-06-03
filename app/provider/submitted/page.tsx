@@ -1,31 +1,68 @@
 import Link from "next/link";
 
-export default async function ProviderSubmittedPage() {
+export default function ProviderSubmittedPage() {
   return (
     <section className="section">
       <div className="card stack-md success-panel">
-        <div className="eyebrow">Submission received</div>
-        <h1 style={{ margin: 0 }}>Thank you. Your provider profile has been sent for admin review.</h1>
+        <div className="eyebrow">
+          Provider Profile Submitted
+        </div>
+
+        <h1 style={{ margin: 0 }}>
+          Your application has been received
+        </h1>
+
         <p className="muted">
-          We saved your details successfully. Your profile will stay hidden from customer search until an admin
-          approves it.
+          Thank you for registering as a service provider.
+          Your profile has been submitted successfully and is
+          currently awaiting admin approval.
         </p>
+
         <div className="booking-steps">
           <div className="step">
-            <strong>What happens next</strong>
-            <p className="muted">An admin reviews your service type, contact details, and Gauteng location.</p>
+            <strong>Profile Review</strong>
+
+            <p className="muted">
+              Our team will verify your business
+              information, services, contact details,
+              and operating location.
+            </p>
           </div>
+
           <div className="step">
-            <strong>When you are approved</strong>
-            <p className="muted">Customers will be able to find you in search and send booking requests.</p>
+            <strong>Approval Process</strong>
+
+            <p className="muted">
+              Once approved, your profile will become
+              visible to customers searching for
+              automotive services.
+            </p>
+          </div>
+
+          <div className="step">
+            <strong>Start Receiving Bookings</strong>
+
+            <p className="muted">
+              Approved providers can receive booking
+              requests, manage appointments, and grow
+              their customer base through the platform.
+            </p>
           </div>
         </div>
+
+        <div className="card">
+          <strong>Status:</strong>
+          <p className="muted">
+            Awaiting admin approval.
+          </p>
+        </div>
+
         <div className="inline-actions">
-          <Link href="/provider" className="button-primary">
-            Back to dashboard
-          </Link>
-          <Link href="/" className="button-secondary">
-            Return home
+         <Link
+  href="/dashboard/provider"
+  className="button-primary"
+>
+           Go to Provider Dashboard
           </Link>
         </div>
       </div>
