@@ -24,7 +24,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
   const { data: bookings } = await supabase
     .from("bookings")
-    .select("id, customer_id, provider_id, appointment_date, issue_description, status, created_at, customer:profiles!bookings_customer_id_fkey(full_name, phone), provider:provider_profiles!bookings_provider_id_fkey(business_name, location)")
+    .select("id, customer_id, provider_id, appointment_date, issue_description, status, created_at, customer:profiles(full_name, phone), provider:provider_profiles!bookings_provider_id_fkey(business_name, location)")
     .returns<BookingRecord[]>()
     .order("created_at", { ascending: false });
 
@@ -115,7 +115,33 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 <span>Customer: {booking.customer?.full_name ?? "Unknown customer"}</span>
                 <span>Appointment: {booking.appointment_date}</span>
                 <span>Location: {booking.provider?.location ?? "Not specified"}</span>
-                <p>{booking.issue_description}</p>
+                <p>
+  <strong>Issue:</strong>
+  <br />
+  {booking.issue_description}
+</p>
+
+<p>
+  <strong>Service Preference:</strong>{" "}
+  {booking.service_preference === "provider_to_me"
+    ? "Provider comes to customer"
+    : booking.service_preference === "i_will_visit"
+    ? "Customer visits workshop"
+    : "Not specified"}
+</p>
+
+{booking.attachment_url ? (
+  <p>
+    <strong>Attachment:</strong>{" "}
+    <a
+      href={booking.attachment_url}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      View Attachment
+    </a>
+  </p>
+) : null}
               </article>
             ))
           ) : (

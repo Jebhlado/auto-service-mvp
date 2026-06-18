@@ -1,3 +1,9 @@
+import {
+  updateQuoteStatus,
+  confirmCompletedJob,
+  createReview
+} from "./actions";
+
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatServices } from "@/lib/utils";
@@ -16,6 +22,32 @@ export default async function CustomerPage({ searchParams }: CustomerPageProps) 
   const location = params.location?.trim() ?? "";
   const service = params.service?.trim() ?? "";
   const supabase = await createClient();
+  const {
+  data: {
+    user
+  }
+} = await supabase.auth.getUser();
+
+let customerBookings = [];
+
+if (user) {
+  const { data } = await supabase
+    .from("bookings")
+    .select(`
+      *,
+      provider:provider_profiles(
+        business_name,
+        location,
+        contact_phone
+      )
+    `)
+    .eq("customer_id", user.id)
+    .order("created_at", {
+      ascending: false
+    });
+
+  customerBookings = data ?? [];
+}
 
   let query = supabase.from("provider_profiles").select("*, profiles(full_name)").eq("approval_status", "approved");
 
@@ -59,14 +91,274 @@ export default async function CustomerPage({ searchParams }: CustomerPageProps) 
     </div>
   </div>
 
-  <div className="card">
-    <p className="muted">
-      Your Bookings
-    </p>
+  {/* DASHBOARD STATS */}
+  <div className="card-grid">
+    <div className="card">
+      <strong>{customerBookings.length}</strong>
+      <p>Total Bookings</p>
+    </div>
+
+    <div className="card">
+      <strong>
+        {
+          customerBookings.filter(
+            (b) => b.status === "pending"
+          ).length
+        }
+      </strong>
+      <p>Pending</p>
+    </div>
+
+    <div className="card">
+      <strong>
+        {
+          customerBookings.filter(
+            (b) => b.status === "confirmed"
+          ).length
+        }
+      </strong>
+      <p>Confirmed</p>
+    </div>
+
+    <div className="card">
+      <strong>
+        {
+          customerBookings.filter(
+            (b) => b.status === "rejected"
+          ).length
+        }
+      </strong>
+      <p>Rejected</p>
+    </div>
   </div>
+
+  <div className="card stack-md">
+  <strong>Your Bookings</strong>
+
+  {customerBookings.length ? (
+    customerBookings.map((booking) => (
+      <article
+        key={booking.id}
+        className="card stack-sm"
+      >
+        <div className="split-row">
+          <strong>
+            {booking.provider?.business_name ?? "Provider"}
+          </strong>
+
+          <span
+            className={`status-chip ${
+              booking.status === "confirmed"
+                ? "status-confirmed"
+                : booking.status === "rejected"
+                ? "status-rejected"
+                : "status-pending"
+            }`}
+          >
+            {booking.status}
+          </span>
+        </div>
+
+        <span>
+          Date: {booking.appointment_date}
+        </span>
+
+        <span>
+          Location:{" "}
+          {booking.provider?.location ?? "Not specified"}
+        </span>
+
+        <p>
+          <strong>Issue:</strong>{" "}
+          {booking.issue_description}
+        </p>
+
+        <p>
+          <strong>Service Preference:</strong>{" "}
+          {booking.service_preference === "provider_to_me"
+            ? "Provider comes to me"
+            : booking.service_preference === "i_will_visit"
+            ? "I will visit provider"
+            : "Not specified"}
+        </p>
+
+        {booking.provider_notes ? (
+          <div className="card">
+            <strong>Provider Notes:</strong>
+            <p>{booking.provider_notes}</p>
+          </div>
+        ) : null}
+
+        {booking.quote_status === "quote_sent" ? (
+  <div className="card">
+    <strong>Quote Received</strong>
+
+    <p>
+      Labour: R{booking.quote_labour ?? 0}
+    </p>
+
+    <p>
+      Parts: R{booking.quote_parts ?? 0}
+    </p>
+
+    <p>
+      Total: R{booking.quote_total ?? 0}
+    </p>
+
+    <p>
+      Notes: {booking.quote_notes ?? "None"}
+    </p>
+
+    <form action={updateQuoteStatus}>
+  <input
+    type="hidden"
+    name="bookingId"
+    value={booking.id}
+  />
+
+  <input
+    type="hidden"
+    name="decision"
+    value="approve"
+  />
+
+  <button
+    type="submit"
+    className="button-primary"
+  >
+    Approve Quote
+  </button>
+</form>
+
+<form action={updateQuoteStatus}>
+  <input
+    type="hidden"
+    name="bookingId"
+    value={booking.id}
+  />
+
+  <input
+    type="hidden"
+    name="decision"
+    value="reject"
+  />
+
+  <button
+    type="submit"
+    className="button-secondary"
+  >
+    Reject Quote
+  </button>
+</form>
+  </div>
+) : null}
+
+        {booking.quote_status === "quote_sent" ? (
+  <div className="card">
+    ...
+  </div>
+) : null}
+
+{booking.status === "completed" ? (
+  <div className="card">
+    <strong>
+      Provider marked this job complete
+    </strong>
+
+    <form action={confirmCompletedJob}>
+      <input
+        type="hidden"
+        name="bookingId"
+        value={booking.id}
+      />
+
+      <button
+        type="submit"
+        className="button-primary"
+      >
+        Confirm Completion
+      </button>
+    </form>
+  </div>
+) : null}
+
+{booking.status === "closed" ? (
+  <div className="card">
+    <strong>Rate Your Experience</strong>
+
+    <form action={createReview}>
+      <input
+        type="hidden"
+        name="bookingId"
+        value={booking.id}
+      />
+
+      <input
+        type="hidden"
+        name="providerId"
+        value={booking.provider_id}
+      />
+
+      <select
+        name="rating"
+        required
+      >
+        <option value="">
+          Select Rating
+        </option>
+        <option value="5">
+          ★★★★★
+        </option>
+        <option value="4">
+          ★★★★
+        </option>
+        <option value="3">
+          ★★★
+        </option>
+        <option value="2">
+          ★★
+        </option>
+        <option value="1">
+          ★
+        </option>
+      </select>
+
+      <textarea
+        name="review"
+        placeholder="Tell others about your experience..."
+      />
+
+      <button
+        type="submit"
+        className="button-primary"
+      >
+        Submit Review
+      </button>
+    </form>
+  </div>
+) : null}
+
+{booking.attachment_url ? (
+  <a
+    href={booking.attachment_url}
+    target="_blank"
+    rel="noreferrer"
+    className="button-secondary"
+  >
+    View Attachment
+  </a>
+) : null}
+      </article>
+    ))
+  ) : (
+    <p className="muted">
+      No bookings yet.
+    </p>
+  )}
+</div>
 </section>
 
-      <form className="card form-grid" method="GET">
+<form className="card form-grid" method="GET">
   {/* LOCATION DROPDOWN */}
   <select name="location" defaultValue={location}>
     <option value="">Select location</option>
@@ -151,3 +443,4 @@ export default async function CustomerPage({ searchParams }: CustomerPageProps) 
     </section>
   );
 }
+

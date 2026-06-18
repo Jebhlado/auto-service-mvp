@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { markJobComplete } from "@/app/provider/actions";
 import { GAUTENG_LOCATIONS, PROVIDER_SPECIALISTS } from "@/lib/provider-options";
 import type { BookingRecord, ProfileRecord, ProviderProfileRecord } from "@/lib/types";
 
@@ -11,72 +12,139 @@ type ProviderDashboardState = {
   profile: ProfileRecord | null;
   providerProfile: ProviderProfileRecord | null;
   bookings: BookingRecord[];
+
+  totalBookings: number;
+  pendingBookings: number;
+  confirmedBookings: number;
+  rejectedBookings: number;
 };
 
 export function ProviderDashboardClient() {
   const searchParams = useSearchParams();
   const [state, setState] = useState<ProviderDashboardState>({
-    profile: null,
-    providerProfile: null,
-    bookings: []
-  });
+  profile: null,
+  providerProfile: null,
+  bookings: [],
+
+  totalBookings: 0,
+  pendingBookings: 0,
+  confirmedBookings: 0,
+  rejectedBookings: 0
+  }); 
+  
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const [bookingNotes, setBookingNotes] = useState<
+  Record<string, string>
+  >({});
+
+  const [quoteLabour, setQuoteLabour] = useState<Record<string, string>>({});
+
+  const [quoteParts, setQuoteParts] = useState<Record<string, string>>({});
+
+  const [quoteNotes, setQuoteNotes] = useState<Record<string, string>>({});
+
   const onboarding = searchParams.get("onboarding") === "1";
+  
 
   async function loadDashboard() {
-    const supabase = createClient();
-    const {
-      data: { user }
-    } = await supabase.auth.getUser();
+  const supabase = createClient();
 
-    if (!user) {
-      setState({
-        profile: null,
-        providerProfile: null,
-        bookings: []
-      });
-      setLoading(false);
-      return;
-    }
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
 
-    const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single<ProfileRecord>();
-
-    if (!profile || profile.role !== "provider") {
-      setState({
-        profile,
-        providerProfile: null,
-        bookings: []
-      });
-      setLoading(false);
-      return;
-    }
-
-    const { data: providerProfile } = await supabase
-      .from("provider_profiles")
-      .select("*")
-      .eq("user_id", user.id)
-      .single<ProviderProfileRecord>();
-
-    const { data: bookings } = await supabase
-      .from("bookings")
-      .select(
-        "id, customer_id, provider_id, appointment_date, issue_description, status, created_at, customer:profiles!bookings_customer_id_fkey(full_name, phone)"
-      )
-      .eq("provider_id", user.id)
-      .returns<BookingRecord[]>()
-      .order("created_at", { ascending: false });
-
+  if (!user) {
     setState({
-      profile,
-      providerProfile: providerProfile ?? null,
-      bookings: bookings ?? []
+      profile: null,
+      providerProfile: null,
+      bookings: []
     });
     setLoading(false);
+    return;
   }
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single<ProfileRecord>();
+
+  if (!profile || profile.role !== "provider") {
+    setState({
+      profile,
+      providerProfile: null,
+      bookings: []
+    });
+    setLoading(false);
+    return;
+  }
+
+  const { data: providerProfile } = await supabase
+    .from("provider_profiles")
+    .select("*")
+    .eq("user_id", user.id)
+    .single<ProviderProfileRecord>();
+
+  const { data: bookings } = await supabase
+    .from("bookings")
+    .select("*")
+    .eq("provider_id", user.id)
+    .order("created_at", { ascending: false });
+
+
+  const customerIds =
+    bookings?.map((booking) => booking.customer_id) ?? [];
+
+  const { data: customers } = await supabase
+  .from("profiles")
+  .select("id, full_name, phone, email")
+  .in("id", customerIds);
+  console.log("CUSTOMERS:", customers);
+
+  const enrichedBookings =
+    bookings?.map((booking) => ({
+      ...booking,
+      customer:
+        customers?.find(
+          (customer) => customer.id === booking.customer_id
+        ) ?? null
+    })) ?? [];
+    
+
+    const totalBookings = enrichedBookings.length;
+
+const pendingBookings =
+  enrichedBookings.filter(
+    (booking) => booking.status === "pending"
+  ).length;
+
+const confirmedBookings =
+  enrichedBookings.filter(
+    (booking) => booking.status === "confirmed"
+  ).length;
+
+const rejectedBookings =
+  enrichedBookings.filter(
+    (booking) => booking.status === "rejected"
+  ).length;
+
+  setState({
+  profile,
+  providerProfile: providerProfile ?? null,
+  bookings: enrichedBookings as BookingRecord[],
+
+  totalBookings,
+  pendingBookings,
+  confirmedBookings,
+  rejectedBookings
+});
+
+  setLoading(false);
+}
   useEffect(() => {
     loadDashboard();
   }, []);
@@ -132,6 +200,79 @@ export function ProviderDashboardClient() {
     setFeedback(`Booking ${status === "confirmed" ? "accepted" : "rejected"} successfully.`);
     await loadDashboard();
   }
+
+  async function handleBookingNotes(
+  bookingId: string
+  ) {
+console.log("Booking ID:", bookingId);
+console.log(
+  "Note:",
+  bookingNotes[bookingId]
+);
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+  .from("bookings")
+  .update({
+  provider_notes:
+  bookingNotes[bookingId] ?? ""
+  })
+  .eq("id", bookingId)
+  .select();
+
+  console.log("Result:", data);
+  console.log("Error:", error);
+
+  if (error) {
+  setError(error.message);
+  return;
+  }
+  
+
+  setFeedback(
+  "Provider notes saved successfully."
+  );
+
+  await loadDashboard();
+  }
+
+  async function handleSendQuote(
+  bookingId: string
+) {
+  const labour = Number(
+    quoteLabour[bookingId] ?? 0
+  );
+
+  const parts = Number(
+    quoteParts[bookingId] ?? 0
+  );
+
+  const total = labour + parts;
+
+  const supabase = createClient();
+
+  const { error } = await supabase
+    .from("bookings")
+    .update({
+      quote_labour: labour,
+      quote_parts: parts,
+      quote_total: total,
+      quote_notes:
+        quoteNotes[bookingId] ?? "",
+      quote_status: "quote_sent",
+      quote_sent_at:
+        new Date().toISOString()
+    })
+    .eq("id", bookingId);
+
+  if (error) {
+    setError(error.message);
+    return;
+  }
+
+  setFeedback("Quote sent successfully.");
+  await loadDashboard();
+}
 
   if (loading) {
     return (
@@ -213,6 +354,28 @@ export function ProviderDashboardClient() {
         </div>
       ) : null}
 
+      <div className="card-grid">
+  <div className="card">
+    <strong>{state.totalBookings}</strong>
+    <p>Total Bookings</p>
+  </div>
+
+  <div className="card">
+    <strong>{state.pendingBookings}</strong>
+    <p>Pending</p>
+  </div>
+
+  <div className="card">
+    <strong>{state.confirmedBookings}</strong>
+    <p>Confirmed</p>
+  </div>
+
+  <div className="card">
+    <strong>{state.rejectedBookings}</strong>
+    <p>Rejected</p>
+  </div>
+</div>
+
       <div className="dashboard-grid">
         <form
           action={(formData) => {
@@ -270,7 +433,10 @@ export function ProviderDashboardClient() {
         </form>
 
         <div className="card stack-md">
-          <div className="eyebrow">Booking requests</div>
+
+  <div className="eyebrow">
+    Booking requests
+  </div>
           {state.bookings.length ? (
             state.bookings.map((booking) => (
               <article key={booking.id} className="card stack-sm">
@@ -289,8 +455,143 @@ export function ProviderDashboardClient() {
                   </span>
                 </div>
                 <span>Date: {booking.appointment_date}</span>
-                <span>Phone: {booking.customer?.phone ?? "Not supplied"}</span>
-                <p>{booking.issue_description}</p>
+
+                <span>
+                  Phone: {booking.customer?.phone ?? "Not supplied"}
+                </span>
+
+                <span>
+                  Email: {booking.customer?.email ?? "No email"}
+                </span>
+
+                <p>
+                  <strong>Issue:</strong>
+                  <br />
+                  {booking.issue_description}
+                </p>
+
+                <p>
+                  <strong>Service Preference:</strong>{" "}
+                  {booking.service_preference === "provider_to_me"
+                    ? "Provider comes to customer"
+                    : booking.service_preference === "i_will_visit"
+                    ? "Customer will visit workshop"
+                    : "Not specified"}
+                </p>
+
+                {booking.attachment_url ? (
+                  <div>
+                    <strong>Attachment:</strong>
+
+                    <br />
+
+                    <a
+                      href={booking.attachment_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="button-secondary"
+                    >
+                      View Attachment
+                    </a>
+                  </div>
+                ) : null}
+
+                <div className="stack-sm">
+                <strong>Provider Notes</strong>
+
+                <textarea
+                  value={
+                    bookingNotes[booking.id] ??
+                    booking.provider_notes ??
+                    ""
+                  }
+                  onChange={(e) =>
+                    setBookingNotes({
+                      ...bookingNotes,
+                      [booking.id]: e.target.value
+                    })
+                  }
+                  placeholder="Add notes for the customer..."
+                  rows={4}
+                />
+
+                <button
+                type="button"
+                className="button-secondary"
+                onClick={() =>
+                handleBookingNotes(booking.id)
+                }
+
+                >
+
+                Save Notes </button>
+
+              </div>
+
+              {booking.quote_status === "quote_sent" ? (
+                <div className="card">
+                  <strong>Quote Sent</strong>
+
+                  <p>
+                    Total: R{booking.quote_total ?? 0}
+                  </p>
+
+                  <p>
+                    Waiting for customer approval.
+                  </p>
+                </div>
+              ) : (
+                <div className="stack-sm">
+              <strong>Quote Details</strong>
+
+              <input
+                type="number"
+                placeholder="Labour Cost (R)"
+                value={quoteLabour[booking.id] ?? ""}
+                onChange={(e) =>
+                  setQuoteLabour({
+                    ...quoteLabour,
+                    [booking.id]: e.target.value
+                  })
+                }
+              />
+
+              <input
+                type="number"
+                placeholder="Parts Cost (R)"
+                value={quoteParts[booking.id] ?? ""}
+                onChange={(e) =>
+                  setQuoteParts({
+                    ...quoteParts,
+                    [booking.id]: e.target.value
+                  })
+                }
+              />
+
+              <textarea
+                placeholder="Quote notes..."
+                value={quoteNotes[booking.id] ?? ""}
+                onChange={(e) =>
+                  setQuoteNotes({
+                    ...quoteNotes,
+                    [booking.id]: e.target.value
+                  })
+                }
+                rows={4}
+              />
+
+              <button
+                type="button"
+                className="button-primary"
+                onClick={() =>
+                  handleSendQuote(booking.id)
+                }
+              >
+                Send Quote
+              </button>
+              </div>
+              )}
+
                 {booking.status === "pending" ? (
                   <div className="inline-actions">
                     <button
@@ -298,7 +599,12 @@ export function ProviderDashboardClient() {
                       type="button"
                       onClick={() => {
                         startTransition(async () => {
-                          await handleBookingStatus(booking.id, "confirmed");
+                          await handleBookingNotes(booking.id);
+
+                          await handleBookingStatus(
+                            booking.id,
+                            "confirmed"
+                          );
                         });
                       }}
                     >
@@ -309,7 +615,12 @@ export function ProviderDashboardClient() {
                       type="button"
                       onClick={() => {
                         startTransition(async () => {
-                          await handleBookingStatus(booking.id, "rejected");
+                          await handleBookingNotes(booking.id);
+
+                          await handleBookingStatus(
+                            booking.id,
+                            "rejected"
+                          );
                         });
                       }}
                     >
@@ -317,13 +628,29 @@ export function ProviderDashboardClient() {
                     </button>
                   </div>
                 ) : null}
-              </article>
-            ))
-          ) : (
-            <p className="muted">No booking requests yet. Once customers start booking, they will appear here.</p>
-          )}
-        </div>
-      </div>
-    </section>
-  );
-}
+                {booking.status === "in_progress" ? (
+                <form action={markJobComplete}>
+                  <input
+                    type="hidden"
+                    name="bookingId"
+                    value={booking.id}
+                  />
+
+                  <button
+                    type="submit"
+                    className="button-primary"
+                  >
+                    Mark Job Complete
+                  </button>
+                </form>
+              ) : null}
+                            </article>
+                          ))
+                        ) : (
+                          <p className="muted">No booking requests yet. Once customers start booking, they will appear here.</p>
+                        )}
+                      </div>
+                    </div>
+                  </section>
+                );
+              }

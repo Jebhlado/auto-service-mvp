@@ -34,16 +34,42 @@ export type BookingRecord = {
   provider_id: string;
   appointment_date: string;
   issue_description: string;
+
+  provider_notes?: string | null;
+
+  quote_labour?: number | null;
+  quote_parts?: number | null;
+  quote_total?: number | null;
+  quote_notes?: string | null;
+  quote_status?: string | null;
+  quote_sent_at?: string | null;
+  quote_approved_at?: string | null;
+  quote_currency?: string | null;
+
   status: BookingStatus;
   created_at: string;
+
   customer?: {
     full_name: string;
     phone: string | null;
+    email: string;
   } | null;
+
   provider?: {
     business_name: string;
     location: string;
   } | null;
+
   service_preference?: string | null;
-attachment_url?: string | null;
+  attachment_url?: string | null;
+};
+
+export type ReviewRecord = {
+  id: string;
+  booking_id: string;
+  customer_id: string;
+  provider_id: string;
+  rating: number;
+  review_text: string | null;
+  created_at: string;
 };

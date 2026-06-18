@@ -22,7 +22,7 @@ export async function sendNotification(payload: NotificationPayload) {
     },
     body: JSON.stringify({
       from,
-      to: [payload.to],
+      to: ["jebhsteve@gmail.com"],
       subject: payload.subject,
       html: payload.html,
       text: payload.text
