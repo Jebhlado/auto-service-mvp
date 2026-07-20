@@ -17,6 +17,18 @@ type ProviderDashboardState = {
   pendingBookings: number;
   confirmedBookings: number;
   rejectedBookings: number;
+
+  completedBookings: number;
+  totalRevenue: number;
+  averageRating: number;
+  reviewCount: number;
+
+  notifications: {
+  id: string;
+  title: string;
+  message: string;
+  is_read: boolean;
+}[];
 };
 
 export function ProviderDashboardClient() {
@@ -26,16 +38,26 @@ export function ProviderDashboardClient() {
   providerProfile: null,
   bookings: [],
 
+  notifications: [],
+
   totalBookings: 0,
   pendingBookings: 0,
   confirmedBookings: 0,
-  rejectedBookings: 0
-  }); 
+  rejectedBookings: 0,
+
+  completedBookings: 0,
+  totalRevenue: 0,
+  averageRating: 0,
+  reviewCount: 0
+});
   
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const [savedNotes, setSavedNotes] =
+  useState<Record<string, boolean>>({});
 
   const [bookingNotes, setBookingNotes] = useState<
   Record<string, string>
@@ -94,7 +116,20 @@ export function ProviderDashboardClient() {
     .select("*")
     .eq("provider_id", user.id)
     .order("created_at", { ascending: false });
+    
+    const { data: notifications } = await supabase
+  .from("notifications")
+  .select("*")
+  .eq("user_id", user.id)
+  .order("created_at", { ascending: false });
 
+  if (notifications?.length) {
+  await supabase
+    .from("notifications")
+    .update({ is_read: true })
+    .eq("user_id", user.id)
+    .eq("is_read", false);
+}
 
   const customerIds =
     bookings?.map((booking) => booking.customer_id) ?? [];
@@ -131,16 +166,60 @@ const rejectedBookings =
   enrichedBookings.filter(
     (booking) => booking.status === "rejected"
   ).length;
+  const completedBookings =
+  enrichedBookings.filter(
+    (booking) => booking.status === "closed"
+  ).length;
+
+const totalRevenue =
+  enrichedBookings
+    .filter(
+      (booking) =>
+        booking.status === "closed"
+    )
+    .reduce(
+      (sum, booking) =>
+        sum + (booking.quote_total ?? 0),
+      0
+    );
+
+const { data: reviews } = await supabase
+  .from("reviews")
+  .select("rating")
+  .eq("provider_id", user.id);
+
+const reviewCount =
+  reviews?.length ?? 0;
+
+const averageRating =
+  reviewCount > 0
+    ? Number(
+        (
+          reviews!.reduce(
+            (sum, review) =>
+              sum + review.rating,
+            0
+          ) / reviewCount
+        ).toFixed(1)
+      )
+    : 0;
 
   setState({
   profile,
   providerProfile: providerProfile ?? null,
   bookings: enrichedBookings as BookingRecord[],
 
+  notifications: notifications ?? [],
+
   totalBookings,
   pendingBookings,
   confirmedBookings,
-  rejectedBookings
+  rejectedBookings,
+
+  completedBookings,
+  totalRevenue,
+  averageRating,
+  reviewCount
 });
 
   setLoading(false);
@@ -229,11 +308,16 @@ console.log(
   }
   
 
-  setFeedback(
+ setFeedback(
   "Provider notes saved successfully."
-  );
+);
 
-  await loadDashboard();
+setSavedNotes({
+  ...savedNotes,
+  [bookingId]: true
+});
+
+await loadDashboard();
   }
 
   async function handleSendQuote(
@@ -330,15 +414,16 @@ console.log(
         </span>
       </div>
 
-      {onboarding ? (
-        <div className="card">
-          <strong>Complete your provider registration</strong>
-          <p className="muted">
-            Your account was created successfully. Please complete this form so we can send your provider profile for
-            admin approval.
-          </p>
-        </div>
-      ) : null}
+      {onboarding &&
+        state.providerProfile?.approval_status !== "approved" ? (
+          <div className="card">
+            <strong>Complete your provider registration</strong>
+            <p className="muted">
+              Your account was created successfully. Please complete this form so we can send your provider profile for
+              admin approval.
+            </p>
+          </div>
+        ) : null}
 
       {error ? (
         <div className="card">
@@ -374,6 +459,26 @@ console.log(
     <strong>{state.rejectedBookings}</strong>
     <p>Rejected</p>
   </div>
+
+<div className="card">
+  <strong>{state.completedBookings}</strong>
+  <p>Completed Jobs</p>
+</div>
+
+<div className="card">
+  <strong>R{state.totalRevenue.toLocaleString()}</strong>
+  <p>Revenue</p>
+</div>
+
+<div className="card">
+  <strong>⭐ {state.averageRating}</strong>
+  <p>Average Rating</p>
+</div>
+
+<div className="card">
+  <strong>{state.reviewCount}</strong>
+  <p>Reviews</p>
+ </div>
 </div>
 
       <div className="dashboard-grid">
@@ -430,9 +535,40 @@ console.log(
           <button className="button-primary" type="submit" disabled={isPending}>
             {isPending ? "Saving profile..." : "Save profile for admin review"}
           </button>
-        </form>
+</form>
 
-        <div className="card stack-md">
+<div className="card stack-md">
+  <div className="eyebrow">
+    Notifications
+  </div>
+
+  {state.notifications.length ? (
+    state.notifications.map((notification) => (
+      <div
+        key={notification.id}
+        className="card"
+      >
+        <strong>
+          {notification.title}
+        </strong>
+
+        <p>
+          {notification.message}
+        </p>
+
+        {!notification.is_read && (
+          <span className="status-chip status-pending">
+            Unread
+          </span>
+        )}
+      </div>
+    ))
+  ) : (
+    <p>No notifications yet</p>
+  )}
+</div>
+
+<div className="card stack-md">
 
   <div className="eyebrow">
     Booking requests
@@ -516,19 +652,32 @@ console.log(
                 />
 
                 <button
-                type="button"
-                className="button-secondary"
-                onClick={() =>
-                handleBookingNotes(booking.id)
-                }
-
+                  type="button"
+                  className="button-secondary"
+                  onClick={() =>
+                    handleBookingNotes(booking.id)
+                  }
                 >
-
-                Save Notes </button>
+                  {savedNotes[booking.id]
+                    ? "Saved ✓"
+                    : "Save Notes"}
+                </button>
 
               </div>
 
-              {booking.quote_status === "quote_sent" ? (
+              {booking.status === "closed" ? (
+              <div className="card">
+                <strong>Job Closed</strong>
+
+                <p>
+                  Total: R{booking.quote_total ?? 0}
+                </p>
+
+                <p>
+                  Customer has confirmed completion.
+                </p>
+              </div>
+              ) : booking.quote_status === "quote_sent" ? (
                 <div className="card">
                   <strong>Quote Sent</strong>
 

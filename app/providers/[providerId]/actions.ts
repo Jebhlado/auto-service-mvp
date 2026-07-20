@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sendNotification } from "@/lib/notifications";
+import { createNotification } from "@/lib/create-notification";
 
 export async function createBookingAction(formData: FormData) {
   const { user, profile } = await requireRole(["customer"]);
@@ -71,6 +72,12 @@ export async function createBookingAction(formData: FormData) {
       )}`
     );
   }
+
+  await createNotification(
+  providerId,
+  "New Booking",
+  `${profile.full_name} submitted a new booking request.`
+);
 
   const { data: provider } = await supabase
     .from("provider_profiles")

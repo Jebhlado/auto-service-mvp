@@ -1,41 +1,144 @@
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { updateProviderApprovalAction } from "@/app/admin/actions";
-import type { BookingRecord, ProviderProfileRecord } from "@/lib/types";
+import {
+  updateProviderApprovalAction,
+  toggleProviderStatusAction,
+  cancelBookingAction,
+  markBookingResolvedAction
+} from "@/app/admin/actions";
+
+import {
+  getPendingProviders,
+  getProviders,
+} from "@/app/admin/lib/admin";
+
+import type {
+  BookingRecord,
+  ProfileRecord,
+  ProviderProfileRecord,
+} from "@/lib/types";
+import type { BookingRecord, ProfileRecord, ProviderProfileRecord } from "@/lib/types";
 
 type AdminPageProps = {
   searchParams: Promise<{
     error?: string;
     success?: string;
+    bookingStatus?: string;
+    providerSearch?: string;
   }>;
 };
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
-  await requireRole(["admin"]);
   const params = await searchParams;
+  const bookingStatus =
+  params.bookingStatus ?? "all";
+  const providerSearch =
+  params.providerSearch?.trim() ?? "";
   const supabase = await createClient();
 
-  const { data: pendingProviders } = await supabase
-    .from("provider_profiles")
-    .select("*, profiles(full_name)")
-    .eq("approval_status", "pending")
-    .returns<ProviderProfileRecord[]>()
-    .order("created_at", { ascending: false });
+const allProviders = await getProviders(providerSearch);
 
-  const { data: bookings } = await supabase
-    .from("bookings")
-    .select("id, customer_id, provider_id, appointment_date, issue_description, status, created_at, customer:profiles(full_name, phone), provider:provider_profiles!bookings_provider_id_fkey(business_name, location)")
+  const { data: allCustomers } = await supabase
+  .from("profiles")
+  .select("*")
+  .eq("role", "customer")
+  .returns<ProfileRecord[]>()
+  .order("created_at", {
+    ascending: false,
+  });
+    
+  let bookingsQuery = supabase
+  .from("bookings")
+  .select(
+    "id, customer_id, provider_id, appointment_date, issue_description, status, created_at, quote_total, customer:profiles(full_name, phone), provider:provider_profiles!bookings_provider_id_fkey(business_name, location)"
+  );
+
+if (bookingStatus !== "all") {
+  bookingsQuery = bookingsQuery.eq(
+    "status",
+    bookingStatus
+  );
+}
+
+const { data: bookings } =
+  await bookingsQuery
     .returns<BookingRecord[]>()
-    .order("created_at", { ascending: false });
+    .order("created_at", {
+      ascending: false
+    });
+    const { count: totalCustomers } =
+  await supabase
+    .from("profiles")
+    .select("*", {
+      count: "exact",
+      head: true
+    })
+    .eq("role", "customer");
+
+const { count: totalProviders } =
+  await supabase
+    .from("profiles")
+    .select("*", {
+      count: "exact",
+      head: true
+    })
+    .eq("role", "provider");
+
+const pendingApprovals =
+  pendingProviders?.length ?? 0;
+
+const activeBookings =
+  bookings?.filter(
+    (booking) =>
+      booking.status !== "closed" &&
+      booking.status !== "rejected"
+  ).length ?? 0;
+
+const completedJobs =
+  bookings?.filter(
+    (booking) =>
+      booking.status === "closed"
+  ).length ?? 0;
+
+  const pendingBookings =
+  bookings?.filter(
+    (booking) =>
+      booking.status === "pending"
+  ).length ?? 0;
+
+const confirmedBookings =
+  bookings?.filter(
+    (booking) =>
+      booking.status === "confirmed"
+  ).length ?? 0;
+
+const inProgressBookings =
+  bookings?.filter(
+    (booking) =>
+      booking.status === "in_progress"
+  ).length ?? 0;
+
+const rejectedBookings =
+  bookings?.filter(
+    (booking) =>
+      booking.status === "rejected"
+  ).length ?? 0;
+
+const closedBookings =
+  bookings?.filter(
+    (booking) =>
+      booking.status === "closed"
+  ).length ?? 0;
+
+const platformRevenue =
+  bookings?.reduce(
+    (sum, booking) =>
+      sum + (booking.quote_total ?? 0),
+    0
+  ) ?? 0;
 
   return (
-    <section className="section">
-      <div className="section-heading">
-        <div>
-          <div className="eyebrow">Admin</div>
-          <h1>Approvals and booking oversight</h1>
-        </div>
-      </div>
+    <>
 
       {params.error ? (
         <div className="card">
@@ -52,17 +155,123 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       ) : null}
 
       <div className="dashboard-grid">
+  <div className="card">
+    <strong>{totalCustomers ?? 0}</strong>
+    <p>Total Customers</p>
+  </div>
+
+  <div className="card">
+    <strong>{totalProviders ?? 0}</strong>
+    <p>Total Providers</p>
+  </div>
+
+  <div className="card">
+    <strong>{pendingApprovals}</strong>
+    <p>Pending Approvals</p>
+  </div>
+
+  <div className="card">
+    <strong>{activeBookings}</strong>
+    <p>Active Bookings</p>
+  </div>
+
+  <div className="card">
+    <strong>{completedJobs}</strong>
+    <p>Completed Jobs</p>
+  </div>
+
+  <div className="card">
+    <strong>R{platformRevenue}</strong>
+    <p>Platform Revenue</p>
+  </div>
+  
+  <div className="card">
+  <strong>{pendingBookings}</strong>
+  <p>Pending Bookings</p>
+</div>
+
+<div className="card">
+  <strong>{confirmedBookings}</strong>
+  <p>Confirmed Bookings</p>
+</div>
+
+<div className="card">
+  <strong>{inProgressBookings}</strong>
+  <p>In Progress</p>
+</div>
+
+<div className="card">
+  <strong>{rejectedBookings}</strong>
+  <p>Rejected Bookings</p>
+</div>
+
+<div className="card">
+  <strong>{closedBookings}</strong>
+  <p>Closed Jobs</p>
+</div>
+</div>
+
+<div className="dashboard-grid">
+  
         <div className="card stack-md">
-          <div className="eyebrow">Pending provider approvals</div>
+  <div className="split-row">
+    <div className="eyebrow">
+      All Providers
+    </div>
+
+    <form method="GET" className="inline-actions">
+      <input
+        type="text"
+        name="providerSearch"
+        placeholder="Search providers..."
+        defaultValue={providerSearch}
+      />
+
+      <button
+        type="submit"
+        className="button-secondary"
+      >
+        Search
+      </button>
+    </form>
+  </div>
           {pendingProviders?.length ? (
             pendingProviders.map((provider) => (
               <article key={provider.user_id} className="card stack-sm">
                 <strong>{provider.business_name}</strong>
-                <span className="muted">{provider.profiles?.full_name}</span>
-                <span>{provider.location || "No location added yet"}</span>
-                <span>{provider.contact_email}</span>
-                <span>{provider.contact_phone}</span>
-                <p>{provider.bio || "No provider bio yet."}</p>
+
+                <p>
+                  <strong>Owner:</strong>{" "}
+                  {provider.profiles?.full_name}
+                </p>
+
+                <p>
+                  <strong>Location:</strong>{" "}
+                  {provider.location || "No location added yet"}
+                </p>
+
+                <p>
+                  <strong>Email:</strong>{" "}
+                  {provider.contact_email}
+                </p>
+
+                <p>
+                  <strong>Phone:</strong>{" "}
+                  {provider.contact_phone}
+                </p>
+
+                <p>
+                  <strong>Submitted:</strong>{" "}
+                  {new Date(
+                    provider.created_at
+                  ).toLocaleDateString()}
+                </p>
+
+                <p>
+                  <strong>Bio:</strong>
+                  <br />
+                  {provider.bio || "No provider bio yet."}
+                </p>
                 <div className="pill-list">
                   {provider.services.map((item) => (
                     <span key={item} className="pill">
@@ -70,6 +279,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                     </span>
                   ))}
                 </div>
+
+                
                 <div className="inline-actions">
                   <form action={updateProviderApprovalAction}>
                     <input type="hidden" name="providerId" value={provider.user_id} />
@@ -94,7 +305,268 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         </div>
 
         <div className="card stack-md">
-          <div className="eyebrow">All bookings</div>
+  <div className="eyebrow">All Providers</div>
+
+  {allProviders?.length ? (
+    allProviders.map((provider) => {
+  const providerBookings =
+    bookings?.filter(
+      (booking) =>
+        booking.provider_id === provider.user_id
+    ) ?? [];
+
+  const totalBookings =
+    providerBookings.length;
+
+  const completedJobs =
+    providerBookings.filter(
+      (booking) =>
+        booking.status === "closed"
+    ).length;
+
+  const revenue =
+    providerBookings.reduce(
+      (sum, booking) =>
+        sum + (booking.quote_total ?? 0),
+      0
+    );
+
+  return (
+    <article
+        key={provider.user_id}
+        className="card stack-sm"
+      >
+        <strong>
+          {provider.business_name}
+        </strong>
+
+        <span className="muted">
+          {provider.profiles?.full_name}
+        </span>
+
+        <span>
+          {provider.location || "No location"}
+        </span>
+
+        <span>
+          {provider.contact_email}
+        </span>
+
+        <span>
+          {provider.contact_phone}
+        </span>
+
+        <div className="card">
+  <strong>
+    {totalBookings}
+  </strong>
+  <p>Total Bookings</p>
+</div>
+
+<div className="card">
+  <strong>
+    {completedJobs}
+  </strong>
+  <p>Completed Jobs</p>
+</div>
+
+<div className="card">
+  <strong>
+    R{revenue}
+  </strong>
+  <p>Revenue</p>
+</div>
+
+        <div className="pill-list">
+  <span
+    className={`status-chip ${
+      provider.approval_status === "approved"
+        ? "status-confirmed"
+        : provider.approval_status === "rejected"
+        ? "status-rejected"
+        : "status-pending"
+    }`}
+  >
+    {provider.approval_status.toUpperCase()}
+  </span>
+
+  <span
+    className={`status-chip ${
+      provider.is_active
+        ? "status-confirmed"
+        : "status-rejected"
+    }`}
+  >
+    {provider.is_active
+      ? "ACTIVE"
+      : "DISABLED"}
+  </span>
+</div>
+        <form action={toggleProviderStatusAction}>
+  <input
+    type="hidden"
+    name="providerId"
+    value={provider.user_id}
+  />
+
+  <input
+    type="hidden"
+    name="isActive"
+    value={String(provider.is_active)}
+  />
+
+  <button
+    type="submit"
+    className="button-secondary"
+  >
+    {provider.is_active
+      ? "Disable Provider"
+      : "Enable Provider"}
+  </button>
+</form>
+      </article>
+  );
+})
+  ) : (
+    <p className="muted">
+      No providers found.
+    </p>
+  )}
+</div>
+
+        <div className="card stack-md">
+          <div className="split-row">
+  <div className="eyebrow">
+    All bookings
+  </div>
+
+  <div className="card stack-md">
+  <div className="eyebrow">
+    All Customers
+  </div>
+
+  {allCustomers?.length ? (
+    allCustomers.map((customer) => {
+      const customerBookings =
+        bookings?.filter(
+          (booking) =>
+            booking.customer_id === customer.id
+        ) ?? [];
+
+      const totalBookings =
+        customerBookings.length;
+
+      const completedBookings =
+        customerBookings.filter(
+          (booking) =>
+            booking.status === "closed"
+        ).length;
+
+      const cancelledBookings =
+        customerBookings.filter(
+          (booking) =>
+            booking.status === "cancelled"
+        ).length;
+
+      return (
+        <article
+          key={customer.id}
+          className="card stack-sm"
+        >
+          <strong>
+            {customer.full_name}
+          </strong>
+
+          <span>
+            {customer.email}
+          </span>
+
+          <span>
+            {customer.phone ??
+              "No phone number"}
+          </span>
+
+          <p>
+            <strong>Member Since:</strong>{" "}
+            {new Date(
+              customer.created_at
+            ).toLocaleDateString()}
+          </p>
+
+          <div className="dashboard-grid">
+            <div className="card">
+              <strong>
+                {totalBookings}
+              </strong>
+              <p>Total Bookings</p>
+            </div>
+
+            <div className="card">
+              <strong>
+                {completedBookings}
+              </strong>
+              <p>Completed</p>
+            </div>
+
+            <div className="card">
+              <strong>
+                {cancelledBookings}
+              </strong>
+              <p>Cancelled</p>
+            </div>
+          </div>
+        </article>
+      );
+    })
+  ) : (
+    <p className="muted">
+      No customers found.
+    </p>
+  )}
+</div>
+
+  <form method="GET" className="inline-actions">
+  <select
+    name="bookingStatus"
+    defaultValue={bookingStatus}
+  >
+    <option value="all">
+      All
+    </option>
+
+    <option value="pending">
+      Pending
+    </option>
+
+    <option value="confirmed">
+      Confirmed
+    </option>
+
+    <option value="in_progress">
+      In Progress
+    </option>
+
+    <option value="closed">
+      Closed
+    </option>
+
+    <option value="cancelled">
+      Cancelled
+    </option>
+
+    <option value="rejected">
+      Rejected
+    </option>
+  </select>
+
+  <button
+    type="submit"
+    className="button-secondary"
+  >
+    Filter
+  </button>
+</form>
+</div>
           {bookings?.length ? (
             bookings.map((booking) => (
               <article key={booking.id} className="card stack-sm">
@@ -142,13 +614,46 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     </a>
   </p>
 ) : null}
+
+<div className="inline-actions">
+  <form action={cancelBookingAction}>
+    <input
+      type="hidden"
+      name="bookingId"
+      value={booking.id}
+    />
+
+    <button
+      type="submit"
+      className="button-secondary"
+    >
+      Cancel Booking
+    </button>
+  </form>
+
+  <form action={markBookingResolvedAction}>
+    <input
+      type="hidden"
+      name="bookingId"
+      value={booking.id}
+    />
+
+    <button
+      type="submit"
+      className="button-primary"
+    >
+      Mark Resolved
+    </button>
+  </form>
+</div>
+
               </article>
             ))
           ) : (
             <p className="muted">No bookings have been created yet.</p>
           )}
-        </div>
+          </div>
       </div>
-    </section>
+    </>
   );
 }

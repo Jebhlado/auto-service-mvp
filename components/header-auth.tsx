@@ -16,6 +16,7 @@ export function HeaderAuth() {
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  
 
   useEffect(() => {
     const supabase = createClient();

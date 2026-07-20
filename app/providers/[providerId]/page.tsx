@@ -22,15 +22,38 @@ export default async function ProviderProfilePage({
   const supabase = await createClient();
 
   const { data: provider } = await supabase
-    .from("provider_profiles")
-    .select("*, profiles(full_name)")
-    .eq("user_id", providerId)
-    .eq("approval_status", "approved")
-    .single();
+  .from("provider_profiles")
+  .select("*, profiles(full_name)")
+  .eq("user_id", providerId)
+  .eq("approval_status", "approved")
+  .eq("is_active", true)
+  .single();
 
   if (!provider) {
     notFound();
   }
+
+  const { data: reviews } = await supabase
+  .from("reviews")
+  .select("*")
+  .eq("provider_id", provider.user_id)
+  .order("created_at", {
+    ascending: false
+  });
+
+const reviewCount =
+  reviews?.length ?? 0;
+
+const averageRating =
+  reviewCount > 0
+    ? (
+        reviews!.reduce(
+          (sum, review) =>
+            sum + review.rating,
+          0
+        ) / reviewCount
+      ).toFixed(1)
+    : null;
 
   return (
     <section className="section">
@@ -42,6 +65,17 @@ export default async function ProviderProfilePage({
           <h1 style={{ margin: 0 }}>
             {provider.business_name}
           </h1>
+
+          {averageRating ? (
+            <p>
+              ⭐ {averageRating}
+              {" "}
+              ({reviewCount} review
+              {reviewCount !== 1 ? "s" : ""})
+            </p>
+          ) : (
+            <p>No reviews yet</p>
+          )}
 
           <p className="muted">
             {provider.location}
@@ -87,6 +121,28 @@ export default async function ProviderProfilePage({
               {provider.mobile_service ? "Yes" : "No"}
             </span>
           </div>
+          <div className="card stack-sm">
+          <strong>Customer Reviews</strong>
+
+          {reviews?.length ? (
+            reviews.map((review) => (
+              <div
+                key={review.id}
+                className="card"
+              >
+                <p>
+                  {"⭐".repeat(review.rating)}
+                </p>
+
+                <p>{review.review_text}</p>
+              </div>
+            ))
+          ) : (
+            <p className="muted">
+              No reviews yet.
+            </p>
+          )}
+        </div>
         </article>
 
         {/* Booking Form */}

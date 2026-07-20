@@ -40,3 +40,102 @@ export async function updateProviderApprovalAction(formData: FormData) {
 
   redirect("/admin?success=provider-updated");
 }
+
+export async function toggleProviderStatusAction(
+  formData: FormData
+) {
+  await requireRole(["admin"]);
+
+  const supabase = await createClient();
+
+  const providerId = String(
+    formData.get("providerId") ?? ""
+  );
+
+  const isActive =
+    String(formData.get("isActive")) ===
+    "true";
+
+  const { error } = await supabase
+    .from("provider_profiles")
+    .update({
+      is_active: !isActive
+    })
+    .eq("user_id", providerId);
+
+  if (error) {
+    redirect(
+      `/admin?error=${encodeURIComponent(
+        error.message
+      )}`
+    );
+  }
+
+  redirect(
+    "/admin?success=provider-status-updated"
+  );
+}
+
+export async function cancelBookingAction(
+  formData: FormData
+) {
+  await requireRole(["admin"]);
+
+  const supabase = await createClient();
+
+  const bookingId = String(
+    formData.get("bookingId") ?? ""
+  );
+
+  const { error } = await supabase
+    .from("bookings")
+    .update({
+      status: "cancelled"
+    })
+    .eq("id", bookingId);
+
+  if (error) {
+    redirect(
+      `/admin?error=${encodeURIComponent(
+        error.message
+      )}`
+    );
+  }
+
+  redirect(
+    "/admin?success=booking-cancelled"
+  );
+}
+
+export async function markBookingResolvedAction(
+  formData: FormData
+) {
+  await requireRole(["admin"]);
+
+  const supabase = await createClient();
+
+  const bookingId = String(
+    formData.get("bookingId") ?? ""
+  );
+
+  const { error } = await supabase
+    .from("bookings")
+    .update({
+      status: "closed"
+    })
+    .eq("id", bookingId);
+
+  if (error) {
+    redirect(
+      `/admin?error=${encodeURIComponent(
+        error.message
+      )}`
+    );
+  }
+
+  redirect(
+    "/admin?success=booking-resolved"
+  );
+}
+
+

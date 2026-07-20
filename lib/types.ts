@@ -1,5 +1,5 @@
 export type UserRole = "customer" | "provider" | "admin";
-export type BookingStatus = "pending" | "confirmed" | "rejected";
+export type BookingStatus = "pending" | "confirmed" | "rejected"| "in_progress" | "completed" | "closed"| "cancelled" ;;
 export type ApprovalStatus = "pending" | "approved" | "rejected";
 
 export type ProfileRecord = {
@@ -12,6 +12,7 @@ export type ProfileRecord = {
 };
 
 export type ProviderProfileRecord = {
+  is_active: boolean;
   user_id: string;
   business_name: string;
   services: string[];
@@ -27,6 +28,15 @@ export type ProviderProfileRecord = {
     full_name: string;
   } | null;
 };
+
+const { data: allCustomers } = await supabase
+  .from("profiles")
+  .select("*")
+  .eq("role", "customer")
+  .returns<ProfileRecord[]>()
+  .order("created_at", {
+    ascending: false,
+  });
 
 export type BookingRecord = {
   id: string;

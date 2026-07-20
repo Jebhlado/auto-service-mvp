@@ -49,7 +49,11 @@ if (user) {
   customerBookings = data ?? [];
 }
 
-  let query = supabase.from("provider_profiles").select("*, profiles(full_name)").eq("approval_status", "approved");
+  let query = supabase
+  .from("provider_profiles")
+  .select("*, profiles(full_name)")
+  .eq("approval_status", "approved")
+  .eq("is_active", true);
 
   if (location) {
     query = query.ilike("location", `%${location}%`);
@@ -61,6 +65,10 @@ if (user) {
 
   const { data } = await query.order("updated_at", { ascending: false });
   const providers = (data ?? []) as ProviderProfileRecord[];
+
+  const { data: reviews } = await supabase
+  .from("reviews")
+  .select("*");
 
   return (
     <section className="section">
@@ -389,12 +397,47 @@ if (user) {
 
      <div className="section card-grid">
   {providers?.length ? (
-    providers.map((provider) => (
-      <article key={provider.user_id} className="card stack-sm">
+    providers.map((provider) => {
+
+  const providerReviews =
+    reviews?.filter(
+      (review) =>
+        review.provider_id === provider.user_id
+    ) ?? [];
+
+  const reviewCount =
+    providerReviews.length;
+
+  const averageRating =
+    reviewCount > 0
+      ? (
+          providerReviews.reduce(
+            (sum, review) =>
+              sum + review.rating,
+            0
+          ) / reviewCount
+        ).toFixed(1)
+      : null;
+
+  return (
+    <article
+      key={provider.user_id}
+      className="card stack-sm"
+    >
         <div className="split-row">
           <div>
             <div className="eyebrow">Approved provider</div>
             <h3 style={{ margin: "0.3rem 0" }}>{provider.business_name}</h3>
+            {averageRating ? (
+  <p>
+    ⭐ {averageRating}
+    {" "}
+    ({reviewCount} review
+    {reviewCount !== 1 ? "s" : ""})
+  </p>
+) : (
+  <p>No reviews yet</p>
+)}
           </div>
           <span className="status-chip status-approved">{provider.approval_status}</span>
         </div>
@@ -418,7 +461,8 @@ if (user) {
           View profile and book
         </Link>
       </article>
-    ))
+    );
+  })
   ) : (
     <div className="card">
       <strong>No providers found yet</strong>
