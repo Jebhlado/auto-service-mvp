@@ -11,6 +11,12 @@ export type ProfileRecord = {
   created_at: string;
 };
 
+export type CustomerSummary = ProfileRecord & {
+  totalBookings: number;
+  completedJobs: number;
+  totalSpent: number;
+};
+
 export type ProviderProfileRecord = {
   is_active: boolean;
   user_id: string;
@@ -28,15 +34,6 @@ export type ProviderProfileRecord = {
     full_name: string;
   } | null;
 };
-
-const { data: allCustomers } = await supabase
-  .from("profiles")
-  .select("*")
-  .eq("role", "customer")
-  .returns<ProfileRecord[]>()
-  .order("created_at", {
-    ascending: false,
-  });
 
 export type BookingRecord = {
   id: string;

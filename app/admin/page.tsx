@@ -1,3 +1,5 @@
+
+
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -12,11 +14,6 @@ import {
   getProviders,
 } from "@/app/admin/lib/admin";
 
-import type {
-  BookingRecord,
-  ProfileRecord,
-  ProviderProfileRecord,
-} from "@/lib/types";
 import type { BookingRecord, ProfileRecord, ProviderProfileRecord } from "@/lib/types";
 
 type AdminPageProps = {
@@ -29,16 +26,26 @@ type AdminPageProps = {
 };
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
+  await requireRole(["admin"]);
+
   const params = await searchParams;
+
   const bookingStatus =
-  params.bookingStatus ?? "all";
+    params.bookingStatus ?? "all";
+
   const providerSearch =
-  params.providerSearch?.trim() ?? "";
-  const supabase = await createClient();
+    params.providerSearch?.trim() ?? "";
 
-const allProviders = await getProviders(providerSearch);
+const supabase = await createClient();
 
-  const { data: allCustomers } = await supabase
+const pendingProviders =
+  await getPendingProviders();
+
+const allProviders =
+  await getProviders(providerSearch);
+
+const { data: allCustomers } = await supabase
+
   .from("profiles")
   .select("*")
   .eq("role", "customer")

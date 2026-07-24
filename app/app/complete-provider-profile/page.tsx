@@ -38,6 +38,7 @@ export default function CompleteProviderProfile() {
   router.push('/provider/submitted')
 
   }
+}
 
   return (
     <div style={{ padding: 20, maxWidth: 600 }}>
