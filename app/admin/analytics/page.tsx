@@ -1,7 +1,13 @@
 import { getAnalyticsSummary } from "@/app/admin/lib/admin";
+import RevenueTrendChart from "./components/RevenueTrendChart";
+import BookingStatusChart from "./components/BookingStatusChart";
+import MonthlyBookingsChart from "./components/MonthlyBookingsChart";
+import TopProvidersLeaderboard from "./components/TopProvidersLeaderboard";
 
 export default async function AnalyticsPage() {
   const analytics = await getAnalyticsSummary();
+
+  console.log(analytics.providerLeaderboard);
 
   return (
     <>
@@ -160,6 +166,25 @@ export default async function AnalyticsPage() {
     </div>
   </div>
 </section>
- </>
-  );
+
+<RevenueTrendChart
+  data={analytics.monthlyRevenue}
+/>
+
+<BookingStatusChart
+  completed={analytics.completedJobs}
+  pending={analytics.pendingJobs}
+  rejected={analytics.rejectedJobs}
+/>
+
+<MonthlyBookingsChart
+  data={analytics.monthlyRevenue}
+/>
+
+<TopProvidersLeaderboard
+  providers={analytics.providerLeaderboard}
+/>
+
+</>
+);
 }

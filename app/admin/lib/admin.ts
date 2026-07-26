@@ -212,6 +212,14 @@ providerStats.forEach((stats, name) => {
   }
 });
 
+const providerLeaderboard = Array.from(providerStats.entries())
+  .map(([name, stats]) => ({
+    name,
+    completedJobs: stats.completedJobs,
+    revenue: stats.revenue,
+  }))
+  .sort((a, b) => b.revenue - a.revenue);
+
 const monthlyRevenueMap = new Map<
   string,
   {
@@ -333,6 +341,8 @@ const bookingGrowth =
     revenueGrowth,
     bookingGrowth,
 
+    providerLeaderboard,
+    
     topProvider,
   };
 }
