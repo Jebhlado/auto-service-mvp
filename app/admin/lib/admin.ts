@@ -77,7 +77,9 @@ export async function getCustomers(search = "") {
  * Booking queries
  */
 
-export async function getBookings() {
+export async function getBookings()
+
+{
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -105,6 +107,43 @@ export async function getBookings() {
   }
 
   return data ?? [];
+}
+
+export async function getRecentActivity() {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("bookings")
+    .select(`
+      id,
+      status,
+      appointment_date,
+      created_at,
+      customer:profiles!bookings_customer_id_fkey (
+        full_name
+      ),
+      provider:provider_profiles!bookings_provider_id_fkey (
+        business_name
+      )
+    `)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (error) {
+    console.error("Failed to fetch recent activity:", error);
+    return [];
+  }
+
+  return (data ?? []).map((booking: any) => ({
+    id: booking.id,
+    status: booking.status,
+    appointmentDate: booking.appointment_date,
+    createdAt: booking.created_at,
+    customer:
+      booking.customer?.full_name ?? "Unknown Customer",
+    provider:
+      booking.provider?.business_name ?? "Unknown Provider",
+  }));
 }
 
 export async function getAnalyticsSummary() {
@@ -218,7 +257,8 @@ const providerLeaderboard = Array.from(providerStats.entries())
     completedJobs: stats.completedJobs,
     revenue: stats.revenue,
   }))
-  .sort((a, b) => b.revenue - a.revenue);
+  .sort((a, b) => b.revenue - a.revenue)
+  .slice(0, 3);
 
 const monthlyRevenueMap = new Map<
   string,
@@ -342,7 +382,7 @@ const bookingGrowth =
     bookingGrowth,
 
     providerLeaderboard,
-    
+
     topProvider,
   };
 }

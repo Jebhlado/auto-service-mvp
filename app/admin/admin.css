@@ -1,0 +1,54 @@
+/* ==========================
+   Admin Layout
+========================== */
+
+.admin-shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+}
+
+.admin-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  padding: 2rem;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+}
+
+.admin-logo {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.admin-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.admin-nav-item {
+  display: flex;
+  align-items: center;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  color: var(--text);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.admin-nav-item:hover {
+  background: rgba(23, 33, 38, 0.08);
+}
+
+.admin-nav-item-active {
+  background: rgba(23, 33, 38, 0.12);
+  border-left: 4px solid var(--brand);
+  font-weight: 700;
+}
+
+.admin-content {
+  padding: 2rem;
+}

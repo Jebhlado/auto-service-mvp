@@ -1,20 +1,14 @@
-
-
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import {
-  updateProviderApprovalAction,
-  toggleProviderStatusAction,
-  cancelBookingAction,
-  markBookingResolvedAction
-} from "@/app/admin/actions";
-
-import {
-  getPendingProviders,
-  getProviders,
-} from "@/app/admin/lib/admin";
-
+import { updateProviderApprovalAction, toggleProviderStatusAction, cancelBookingAction, markBookingResolvedAction } from "@/app/admin/actions";
+import { getPendingProviders, getProviders } from "@/app/admin/lib/admin";
 import type { BookingRecord, ProfileRecord, ProviderProfileRecord } from "@/lib/types";
+import PageSection from "@/components/ui/PageSection";
+import KpiGrid from "@/components/ui/layout/KpiGrid";
+import { buildDashboardStats } from "@/app/admin/lib/dashboard";
+import QuickActionsGrid from "@/components/ui/layout/QuickActionsGrid";
+import QuickActionCard from "@/components/ui/QuickActionCard";
+import StatTile from "@/components/ui/StatTile";
 
 type AdminPageProps = {
   searchParams: Promise<{
@@ -91,58 +85,12 @@ const { count: totalProviders } =
     })
     .eq("role", "provider");
 
-const pendingApprovals =
-  pendingProviders?.length ?? 0;
-
-const activeBookings =
-  bookings?.filter(
-    (booking) =>
-      booking.status !== "closed" &&
-      booking.status !== "rejected"
-  ).length ?? 0;
-
-const completedJobs =
-  bookings?.filter(
-    (booking) =>
-      booking.status === "closed"
-  ).length ?? 0;
-
-  const pendingBookings =
-  bookings?.filter(
-    (booking) =>
-      booking.status === "pending"
-  ).length ?? 0;
-
-const confirmedBookings =
-  bookings?.filter(
-    (booking) =>
-      booking.status === "confirmed"
-  ).length ?? 0;
-
-const inProgressBookings =
-  bookings?.filter(
-    (booking) =>
-      booking.status === "in_progress"
-  ).length ?? 0;
-
-const rejectedBookings =
-  bookings?.filter(
-    (booking) =>
-      booking.status === "rejected"
-  ).length ?? 0;
-
-const closedBookings =
-  bookings?.filter(
-    (booking) =>
-      booking.status === "closed"
-  ).length ?? 0;
-
-const platformRevenue =
-  bookings?.reduce(
-    (sum, booking) =>
-      sum + (booking.quote_total ?? 0),
-    0
-  ) ?? 0;
+  const stats = buildDashboardStats({
+  bookings,
+  pendingProviders,
+  totalCustomers: totalCustomers ?? 0,
+  totalProviders: totalProviders ?? 0,
+});
 
   return (
     <>
@@ -161,62 +109,106 @@ const platformRevenue =
         </div>
       ) : null}
 
-      <div className="dashboard-grid">
-  <div className="card">
-    <strong>{totalCustomers ?? 0}</strong>
-    <p>Total Customers</p>
-  </div>
+<PageSection
+  title="Quick Actions"
+  description="Common administrative tasks."
+>
+  <QuickActionsGrid>
 
-  <div className="card">
-    <strong>{totalProviders ?? 0}</strong>
-    <p>Total Providers</p>
-  </div>
+    <QuickActionCard
+      title="Review Providers"
+      description="Approve or reject newly registered providers."
+      href="/admin/providers"
+      actionLabel="Review"
+    />
 
-  <div className="card">
-    <strong>{pendingApprovals}</strong>
-    <p>Pending Approvals</p>
-  </div>
+    <QuickActionCard
+      title="View Bookings"
+      description="Manage all customer bookings."
+      href="/admin/bookings"
+      actionLabel="Open"
+    />
 
-  <div className="card">
-    <strong>{activeBookings}</strong>
-    <p>Active Bookings</p>
-  </div>
+    <QuickActionCard
+      title="Manage Customers"
+      description="View registered customers."
+      href="/admin/customers"
+      actionLabel="Open"
+    />
 
-  <div className="card">
-    <strong>{completedJobs}</strong>
-    <p>Completed Jobs</p>
-  </div>
+    <QuickActionCard
+      title="Reports"
+      description="Review platform statistics and reports."
+      href="/admin/reports"
+      actionLabel="View"
+    />
 
-  <div className="card">
-    <strong>R{platformRevenue}</strong>
-    <p>Platform Revenue</p>
-  </div>
+  </QuickActionsGrid>
+</PageSection>
+
+      <PageSection
+  title="Overview"
+  description="Key business metrics at a glance."
+>
+
+  <KpiGrid>
+  <StatTile
+  title="Total Customers"
+  value={totalCustomers ?? 0}
+/>
+
+  <StatTile
+  title="Total Providers"
+  value={totalProviders ?? 0}
+/>
+
+  <StatTile
+  title="Pending Approvals"
+  value={stats.pendingApprovals}
+/>
+
+  <StatTile
+  title="Active Bookings"
+  value={stats.activeBookings}
+/>
+
+  <StatTile
+  title="Completed Jobs"
+  value={stats.completedJobs}
+/>
+
+  <StatTile
+  title="Platform Revenue"
+  value={`R${stats.platformRevenue}`}
+/>
   
-  <div className="card">
-  <strong>{pendingBookings}</strong>
-  <p>Pending Bookings</p>
-</div>
+  <StatTile
+  title="Pending Bookings"
+  value={stats.pendingBookings}
+/>
 
-<div className="card">
-  <strong>{confirmedBookings}</strong>
-  <p>Confirmed Bookings</p>
-</div>
+<StatTile
+  title="Confirmed Bookings"
+  value={stats.confirmedBookings}
+/>
 
-<div className="card">
-  <strong>{inProgressBookings}</strong>
-  <p>In Progress</p>
-</div>
+<StatTile
+  title="In Progress"
+  value={stats.inProgressBookings}
+/>
 
-<div className="card">
-  <strong>{rejectedBookings}</strong>
-  <p>Rejected Bookings</p>
-</div>
+<StatTile
+  title="Rejected Bookings"
+  value={stats.rejectedBookings}
+/>
 
-<div className="card">
-  <strong>{closedBookings}</strong>
-  <p>Closed Jobs</p>
-</div>
-</div>
+<StatTile
+  title="Closed Jobs"
+  value={stats.closedBookings}
+/>
+
+</KpiGrid>
+</PageSection>
 
 <div className="dashboard-grid">
   

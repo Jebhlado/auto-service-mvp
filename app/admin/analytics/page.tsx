@@ -1,13 +1,14 @@
-import { getAnalyticsSummary } from "@/app/admin/lib/admin";
+import { getAnalyticsSummary, getRecentActivity } from "@/app/admin/lib/admin";
+
 import RevenueTrendChart from "./components/RevenueTrendChart";
 import BookingStatusChart from "./components/BookingStatusChart";
 import MonthlyBookingsChart from "./components/MonthlyBookingsChart";
 import TopProvidersLeaderboard from "./components/TopProvidersLeaderboard";
+import RecentActivityFeed from "./components/RecentActivityFeed";
 
 export default async function AnalyticsPage() {
   const analytics = await getAnalyticsSummary();
-
-  console.log(analytics.providerLeaderboard);
+  const recentActivity = await getRecentActivity();
 
   return (
     <>
@@ -179,6 +180,10 @@ export default async function AnalyticsPage() {
 
 <MonthlyBookingsChart
   data={analytics.monthlyRevenue}
+/>
+
+<RecentActivityFeed
+  activities={recentActivity}
 />
 
 <TopProvidersLeaderboard

@@ -1,5 +1,7 @@
 import { getBookings } from "@/app/admin/lib/admin";
 import { formatCurrency } from "@/lib/formats";
+import PanelHeader from "@/components/ui/PanelHeader";
+import StatTile from "@/components/ui/StatTile";
 
 export default async function BookingsPage() {
   const bookings = await getBookings();
@@ -29,24 +31,18 @@ const totalRevenue = bookings.reduce(
 
   return (
     <>
-      <div className="section-heading">
-        <div>
-          <div className="eyebrow">Bookings</div>
-
-          <h2>Booking Management</h2>
-
-          <p className="muted">
-            View all customer bookings.
-          </p>
-        </div>
-      </div>
+      <PanelHeader
+  eyebrow="Bookings"
+  title="Booking Management"
+  description="View all customer bookings."
+/>
 
       <div className="dashboard-grid">
 
-  <div className="card">
-    <strong>{totalBookings}</strong>
-    <p>Total Bookings</p>
-  </div>
+  <StatTile
+  title="Total Bookings"
+  value={totalBookings}
+/>
 
   <div className="card">
     <strong>{pendingBookings}</strong>
