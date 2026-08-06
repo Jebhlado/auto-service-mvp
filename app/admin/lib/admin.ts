@@ -64,13 +64,54 @@ export async function getCustomers(search = "") {
     );
   }
 
-  const { data } = await query
+  const { data: customers } = await query
     .returns<ProfileRecord[]>()
     .order("created_at", {
       ascending: false,
     });
 
-  return data ?? [];
+  if (!customers?.length) {
+    return [];
+  }
+
+  const { data: bookings } = await supabase
+    .from("bookings")
+    .select("customer_id, status, quote_total")
+    .returns<
+      {
+        customer_id: string;
+        status: string;
+        quote_total: number | null;
+      }[]
+    >();
+
+  return customers.map((customer) => {
+    const customerBookings =
+      bookings?.filter(
+        (booking) =>
+          booking.customer_id === customer.id
+      ) ?? [];
+
+    return {
+      ...customer,
+
+      totalBookings:
+        customerBookings.length,
+
+      completedJobs:
+        customerBookings.filter(
+          (booking) =>
+            booking.status === "completed"
+        ).length,
+
+      totalSpent:
+        customerBookings.reduce(
+          (sum, booking) =>
+            sum + (booking.quote_total ?? 0),
+          0
+        ),
+    };
+  });
 }
 
 /**

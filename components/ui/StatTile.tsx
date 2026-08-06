@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ReactNode } from "react";
 
 type StatTileProps = {
@@ -5,6 +6,7 @@ type StatTileProps = {
   value: ReactNode;
   icon?: ReactNode;
   subtitle?: ReactNode;
+  href?: string;
 };
 
 export default function StatTile({
@@ -12,8 +14,9 @@ export default function StatTile({
   value,
   icon,
   subtitle,
+  href,
 }: StatTileProps) {
-  return (
+  const content = (
     <div className="card stat-tile">
       {icon && (
         <div className="stat-icon-wrapper">
@@ -35,5 +38,18 @@ export default function StatTile({
         )}
       </div>
     </div>
+  );
+
+  if (!href) {
+    return content;
+  }
+
+  return (
+    <Link
+      href={href}
+      className="stat-tile-link"
+    >
+      {content}
+    </Link>
   );
 }

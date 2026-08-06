@@ -155,26 +155,31 @@ const { count: totalProviders } =
   <StatTile
   title="Total Customers"
   value={totalCustomers ?? 0}
+  href="/admin/customers"
 />
 
   <StatTile
   title="Total Providers"
   value={totalProviders ?? 0}
+  href="/admin/providers"
 />
 
   <StatTile
   title="Pending Approvals"
   value={stats.pendingApprovals}
+  href="/admin/providers?status=pending"
 />
 
   <StatTile
-  title="Active Bookings"
-  value={stats.activeBookings}
+  title="Pending Bookings"
+  value={stats.pendingBookings}
+  href="/admin/bookings?status=pending"
 />
 
   <StatTile
   title="Completed Jobs"
   value={stats.completedJobs}
+  href="/admin/bookings?status=completed"
 />
 
   <StatTile
@@ -185,26 +190,31 @@ const { count: totalProviders } =
   <StatTile
   title="Pending Bookings"
   value={stats.pendingBookings}
+  href="/admin/bookings?status=pending"
 />
 
 <StatTile
   title="Confirmed Bookings"
   value={stats.confirmedBookings}
+  href="/admin/bookings?status=confirmed"
 />
 
 <StatTile
   title="In Progress"
   value={stats.inProgressBookings}
+  href="/admin/bookings?status=in_progress"
 />
 
 <StatTile
   title="Rejected Bookings"
   value={stats.rejectedBookings}
+  href="/admin/bookings?status=rejected"
 />
 
 <StatTile
   title="Closed Jobs"
   value={stats.closedBookings}
+  href="/admin/bookings?status=closed"
 />
 
 </KpiGrid>

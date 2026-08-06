@@ -3,8 +3,30 @@ import { formatCurrency } from "@/lib/formats";
 import PanelHeader from "@/components/ui/PanelHeader";
 import StatTile from "@/components/ui/StatTile";
 
-export default async function BookingsPage() {
+type BookingsPageProps = {
+  searchParams: Promise<{
+    status?: string;
+  }>;
+};
+
+export default async function BookingsPage({
+  searchParams,
+}: BookingsPageProps) {
+
+  const params = await searchParams;
+
+const selectedStatus =
+  params.status ?? "all";
+
   const bookings = await getBookings();
+
+  const filteredBookings =
+  selectedStatus === "all"
+    ? bookings
+    : bookings.filter(
+        (booking) =>
+          booking.status === selectedStatus
+      );
 
   const totalBookings = bookings.length;
 
@@ -73,14 +95,18 @@ const totalRevenue = bookings.reduce(
 
       <div className="card stack-md">
         <div className="eyebrow">
-          All Bookings ({bookings.length})
+          {
+  selectedStatus === "all"
+    ? `All Bookings (${filteredBookings.length})`
+    : `${selectedStatus.toUpperCase()} Bookings (${filteredBookings.length})`
+}
         </div>
 
-        {bookings.length ? (
-          bookings.map((booking) => (
-            <article
-              key={booking.id}
-              className="card stack-sm"
+        {filteredBookings.length ? (
+       filteredBookings.map((booking) => (
+       <article
+      key={booking.id}
+      className="card stack-sm"
             >
               <strong>
                 {booking.customer?.full_name ??
