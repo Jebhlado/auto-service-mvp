@@ -5,6 +5,9 @@ import BookingStatusChart from "./components/BookingStatusChart";
 import MonthlyBookingsChart from "./components/MonthlyBookingsChart";
 import TopProvidersLeaderboard from "./components/TopProvidersLeaderboard";
 import RecentActivityFeed from "./components/RecentActivityFeed";
+import StatTile from "@/components/ui/StatTile";
+import PageSection from "@/components/ui/PageSection";
+import PanelHeader from "@/components/ui/PanelHeader";
 
 export default async function AnalyticsPage() {
   const analytics = await getAnalyticsSummary();
@@ -12,161 +15,161 @@ export default async function AnalyticsPage() {
 
   return (
     <>
-      <div className="page-header">
-        <span className="page-eyebrow">ADMIN</span>
-
-        <h1>Analytics</h1>
-
-        <p>Business insights and performance metrics.</p>
-      </div>
+      <PanelHeader
+  eyebrow="Reports"
+  title="Reports & Analytics"
+  description="Monitor business performance, revenue, trends and operational insights."
+/>
 
       <div className="dashboard-grid">
-        <div className="card">
-          <strong>R {analytics.totalRevenue.toLocaleString()}</strong>
-          <p>Total Revenue</p>
-        </div>
 
-        <div className="card">
-          <strong>{analytics.totalBookings}</strong>
-          <p>Total Bookings</p>
-        </div>
+  <StatTile
+    title="Total Revenue"
+    value={`R ${analytics.totalRevenue.toLocaleString()}`}
+    href="/admin/bookings?status=closed"
+  />
 
-        <div className="card">
-          <strong>{analytics.completedJobs}</strong>
-          <p>Completed Jobs</p>
-        </div>
+  <StatTile
+    title="Total Bookings"
+    value={analytics.totalBookings}
+    href="/admin/bookings"
+  />
 
-        <div className="card">
-          <strong>{analytics.customers}</strong>
-          <p>Customers</p>
-        </div>
+  <StatTile
+    title="Completed Jobs"
+    value={analytics.completedJobs}
+    href="/admin/bookings?status=completed"
+  />
 
-        <div className="card">
-          <strong>{analytics.providers}</strong>
-          <p>Providers</p>
-        </div>
+  <StatTile
+    title="Customers"
+    value={analytics.customers}
+    href="/admin/customers"
+  />
 
-        <div className="card">
-          <strong>R {analytics.averageBookingValue.toLocaleString()}</strong>
-          <p>Average Booking Value</p>
-        </div>
-      </div>
+  <StatTile
+    title="Providers"
+    value={analytics.providers}
+    href="/admin/providers"
+  />
 
-      <section style={{ marginTop: "2rem" }}>
-  <h2>Business Insights</h2>
+  <StatTile
+  title="Average Booking Value"
+  value={`R ${analytics.averageBookingValue.toLocaleString()}`}
+  href="/admin/bookings?status=completed"
+/>
 
-  <p style={{ marginBottom: "1rem" }}>
-    Quick insights into business performance.
-  </p>
+</div>
 
-  <div className="dashboard-grid">
-    <div className="card">
-      <strong>{analytics.completionRate}%</strong>
-      <p>Completion Rate</p>
-    </div>
-
-    <div className="card">
-      <strong>
-        R {analytics.highestBookingValue.toLocaleString()}
-      </strong>
-      <p>Highest Booking</p>
-    </div>
-
-    <div className="card">
-      <strong>{analytics.pendingJobs}</strong>
-      <p>Pending Jobs</p>
-    </div>
-
-    <div className="card">
-      <strong>{analytics.rejectedJobs}</strong>
-      <p>Rejected Jobs</p>
-    </div>
-  </div>
-</section>
-
-<section style={{ marginTop: "2rem" }}>
-  <h2>Monthly Trends</h2>
-
-  <p style={{ marginBottom: "1rem" }}>
-    Compare this month's performance with the previous month.
-  </p>
+<PageSection
+title="Business Insights"
+description="Quick insights into business performance."
+>
 
   <div className="dashboard-grid">
-    <div className="card">
-      <strong>
-        R {analytics.revenueThisMonth.toLocaleString()}
-      </strong>
-      <p>Revenue This Month</p>
-    </div>
 
-    <div className="card">
-      <strong>
-        R {analytics.revenueLastMonth.toLocaleString()}
-      </strong>
-      <p>Revenue Last Month</p>
-    </div>
+  <StatTile
+  title="Completion Rate"
+  value={`${analytics.completionRate}%`}
+/>
 
-    <div className="card">
-      <strong>{analytics.bookingsThisMonth}</strong>
-      <p>Bookings This Month</p>
-    </div>
+    <StatTile
+  title="Highest Booking"
+  value={`R ${analytics.highestBookingValue.toLocaleString()}`}
+/>
 
-    <div className="card">
-      <strong>{analytics.bookingsLastMonth}</strong>
-      <p>Bookings Last Month</p>
-    </div>
+    <StatTile
+  title="Pending Jobs"
+  value={analytics.pendingJobs}
+  href="/admin/bookings?status=pending"
+/>
 
-    <div className="card">
-      <strong>{analytics.revenueGrowth}%</strong>
-      <p>Revenue Growth</p>
-    </div>
+    <StatTile
+  title="Rejected Jobs"
+  value={analytics.rejectedJobs}
+  href="/admin/bookings?status=rejected"
+/>
 
-    <div className="card">
-      <strong>{analytics.bookingGrowth}%</strong>
-      <p>Booking Growth</p>
-    </div>
-  </div>
-</section>
+</div>
 
-    <section style={{ marginTop: "2rem" }}>
-  <h2>Provider Performance</h2>
+</PageSection>
 
-  <p style={{ marginBottom: "1rem" }}>
-    Performance overview of the leading service provider.
-  </p>
+<PageSection
+  title="Monthly Trends"
+  description="Compare this month's performance with the previous month."
+>
+  <div className="dashboard-grid">
+
+  <StatTile
+  title="Revenue This Month"
+  value={`R ${analytics.revenueThisMonth.toLocaleString()}`}
+/>
+
+<StatTile
+  title="Revenue Last Month"
+  value={`R ${analytics.revenueLastMonth.toLocaleString()}`}
+/>
+
+    <StatTile
+  title="Bookings This Month"
+  value={analytics.bookingsThisMonth}
+/>
+
+    <StatTile
+  title="Bookings Last Month"
+  value={analytics.bookingsLastMonth}
+/>
+
+    <StatTile
+  title="Revenue Growth"
+  value={`${analytics.revenueGrowth}%`}
+/>
+
+    <StatTile
+  title="Booking Growth"
+  value={`${analytics.bookingGrowth}%`}
+/>
+
+</div>
+
+</PageSection>
+
+    <PageSection
+  title="Provider Performance"
+  description="Performance overview of the leading service provider."
+>
 
   <div className="dashboard-grid">
-    <div className="card">
-      <strong>{analytics.topProvider.name}</strong>
-      <p>Top Provider</p>
-    </div>
 
-    <div className="card">
-      <strong>{analytics.topProvider.completedJobs}</strong>
-      <p>Completed Jobs</p>
-    </div>
+  <StatTile
+    title="Top Provider"
+    value={analytics.topProvider.name}
+  />
 
-    <div className="card">
-      <strong>
-        R {analytics.topProvider.revenue.toLocaleString()}
-      </strong>
-      <p>Revenue Generated</p>
-    </div>
+  <StatTile
+    title="Completed Jobs"
+    value={analytics.topProvider.completedJobs}
+  />
 
-    <div className="card">
-      <strong>
-        {analytics.topProvider.completedJobs > 0
-          ? (
-              analytics.topProvider.revenue /
-              analytics.topProvider.completedJobs
-            ).toLocaleString()
-          : 0}
-      </strong>
+  <StatTile
+    title="Revenue Generated"
+    value={`R ${analytics.topProvider.revenue.toLocaleString()}`}
+  />
 
-      <p>Average Quote</p>
-    </div>
-  </div>
-</section>
+  <StatTile
+    title="Average Quote"
+    value={
+      analytics.topProvider.completedJobs > 0
+        ? `R ${(
+            analytics.topProvider.revenue /
+            analytics.topProvider.completedJobs
+          ).toLocaleString()}`
+        : "R 0"
+    }
+  />
+
+</div>
+</PageSection>
 
 <RevenueTrendChart
   data={analytics.monthlyRevenue}
