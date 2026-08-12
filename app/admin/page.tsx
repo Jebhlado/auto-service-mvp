@@ -87,7 +87,7 @@ const { count: totalProviders } =
 
   const stats = buildDashboardStats({
   bookings,
-  pendingProviders,
+  pendingProviders: pendingProviders.length,
   totalCustomers: totalCustomers ?? 0,
   totalProviders: totalProviders ?? 0,
 });

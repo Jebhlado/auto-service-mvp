@@ -107,6 +107,99 @@ export async function cancelBookingAction(
   );
 }
 
+export async function confirmBookingAction(
+  formData: FormData
+) {
+  await requireRole(["admin"]);
+
+  const supabase = await createClient();
+
+  const bookingId = String(
+    formData.get("bookingId") ?? ""
+  );
+
+  const { error } = await supabase
+    .from("bookings")
+    .update({
+      status: "confirmed",
+    })
+    .eq("id", bookingId);
+
+  if (error) {
+    redirect(
+      `/admin?error=${encodeURIComponent(
+        error.message
+      )}`
+    );
+  }
+
+  redirect(
+    `/admin/bookings/${bookingId}?success=booking-confirmed`
+  );
+}
+
+export async function startBookingAction(
+  formData: FormData
+) {
+  await requireRole(["admin"]);
+
+  const supabase = await createClient();
+
+  const bookingId = String(
+    formData.get("bookingId") ?? ""
+  );
+
+  const { error } = await supabase
+    .from("bookings")
+    .update({
+      status: "in_progress",
+    })
+    .eq("id", bookingId);
+
+  if (error) {
+    redirect(
+      `/admin?error=${encodeURIComponent(
+        error.message
+      )}`
+    );
+  }
+
+  redirect(
+    `/admin/bookings/${bookingId}?success=booking-started`
+  );
+}
+
+export async function completeBookingAction(
+  formData: FormData
+) {
+  await requireRole(["admin"]);
+
+  const supabase = await createClient();
+
+  const bookingId = String(
+    formData.get("bookingId") ?? ""
+  );
+
+  const { error } = await supabase
+    .from("bookings")
+    .update({
+      status: "completed",
+    })
+    .eq("id", bookingId);
+
+  if (error) {
+    redirect(
+      `/admin?error=${encodeURIComponent(
+        error.message
+      )}`
+    );
+  }
+
+  redirect(
+    `/admin/bookings/${bookingId}?success=booking-completed`
+  );
+}
+
 export async function markBookingResolvedAction(
   formData: FormData
 ) {
@@ -134,8 +227,8 @@ export async function markBookingResolvedAction(
   }
 
   redirect(
-    "/admin?success=booking-resolved"
-  );
+  `/admin/bookings/${bookingId}?success=booking-resolved`
+);
 }
 
 

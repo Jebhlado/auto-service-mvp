@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { Route } from "next";
 
 type AdminNavItemProps = {
-  href: string;
+  href: Route;
   label: string;
 };
 

@@ -107,6 +107,48 @@ export async function testProviderAction() {
   console.log("Provider action works");
 }
 
+export async function updateBookingStatusAction(
+  formData: FormData
+) {
+  const { user } = await requireRole(["provider"]);
+
+  const bookingId = String(
+    formData.get("bookingId") ?? ""
+  );
+
+  const status = String(
+    formData.get("status") ?? ""
+  );
+
+  if (!bookingId) {
+    throw new Error("Booking ID is required.");
+  }
+
+  if (
+    status !== "confirmed" &&
+    status !== "rejected"
+  ) {
+    throw new Error("Invalid booking status.");
+  }
+
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("bookings")
+    .update({
+      status,
+    })
+    .eq("id", bookingId)
+    .eq("provider_id", user.id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/dashboard/provider");
+  revalidatePath("/customer");
+}
+
 export async function markJobComplete(
   formData: FormData
 ) {

@@ -2,6 +2,7 @@ import { getBookings } from "@/app/admin/lib/admin";
 import { formatCurrency } from "@/lib/formats";
 import PanelHeader from "@/components/ui/PanelHeader";
 import StatTile from "@/components/ui/StatTile";
+import Link from "next/link";
 
 type BookingsPageProps = {
   searchParams: Promise<{
@@ -104,33 +105,36 @@ const totalRevenue = bookings.reduce(
 
         {filteredBookings.length ? (
        filteredBookings.map((booking) => (
-       <article
-      key={booking.id}
-      className="card stack-sm"
-            >
-              <strong>
-                {booking.customer?.full_name ??
-                  "Unknown Customer"}
-              </strong>
+  <Link
+    key={booking.id}
+    href={`/admin/bookings/${booking.id}`}
+    className="card stack-sm"
+  >
+    <strong>
+      {booking.customer?.full_name ??
+        "Unknown Customer"}
+    </strong>
 
-              <span>
-                {booking.provider?.business_name ??
-                  "Unknown Provider"}
-              </span>
+    <span>
+      {booking.provider?.business_name ??
+        "Unknown Provider"}
+    </span>
 
-              <span>
-                {new Date(
-                  booking.appointment_date
-                ).toLocaleDateString()}
-              </span>
+    <span>
+      {new Date(
+        booking.appointment_date
+      ).toLocaleDateString()}
+    </span>
 
-              <span>Status: {booking.status}</span>
+    <span>
+      Status: {booking.status}
+    </span>
 
-              <span>
-              Quote: {formatCurrency(booking.quote_total ?? 0)}
-             </span>
-            </article>
-          ))
+    <span>
+      Quote: {formatCurrency(booking.quote_total ?? 0)}
+    </span>
+  </Link>
+))
         ) : (
           <p className="muted">
             No bookings found.

@@ -1,0 +1,196 @@
+import { notFound } from "next/navigation";
+import Link from "next/link";
+
+import { getBookings } from "@/app/admin/lib/admin";
+import { formatCurrency } from "@/lib/formats";
+import PanelHeader from "@/components/ui/PanelHeader";
+import PageSection from "@/components/ui/PageSection";
+import StatTile from "@/components/ui/StatTile";
+
+type BookingDetailsPageProps = {
+  params: Promise<{
+    id: string;
+  }>;
+};
+
+export default async function BookingDetailsPage({
+  params,
+}: BookingDetailsPageProps) {
+  const { id } = await params;
+
+  const bookings = await getBookings();
+
+  const booking = bookings.find(
+    (item) => item.id === id
+  );
+
+  if (!booking) {
+    notFound();
+  }
+
+  return (
+    <>
+      <PanelHeader
+        eyebrow="Booking"
+        title="Booking Details"
+        description="View the complete details and status of this booking."
+      />
+
+      <div className="inline-actions">
+        <Link
+          href="/admin/bookings"
+          className="button-secondary"
+        >
+          ← Back to Bookings
+        </Link>
+      </div>
+
+      <PageSection
+        title="Booking Overview"
+        description="Core information about this service request."
+      >
+        <div className="dashboard-grid">
+          <StatTile
+            title="Status"
+            value={booking.status.toUpperCase()}
+          />
+
+          <StatTile
+            title="Appointment"
+            value={new Date(
+              booking.appointment_date
+            ).toLocaleDateString()}
+          />
+
+          <StatTile
+            title="Quote"
+            value={formatCurrency(
+              booking.quote_total ?? 0
+            )}
+          />
+        </div>
+      </PageSection>
+
+      <PageSection
+        title="Customer"
+        description="Customer information associated with this booking."
+      >
+        <div className="card stack-sm">
+          <strong>
+            {booking.customer?.full_name ??
+              "Unknown Customer"}
+          </strong>
+
+          <span>
+            {booking.customer?.email ??
+              "No email available"}
+          </span>
+
+          <span>
+            {booking.customer?.phone ??
+              "No phone number available"}
+          </span>
+        </div>
+      </PageSection>
+
+      <PageSection
+        title="Service Provider"
+        description="Provider assigned to this booking."
+      >
+        <div className="card stack-sm">
+          <strong>
+            {booking.provider?.business_name ??
+              "Unknown Provider"}
+          </strong>
+
+          <span>
+            {booking.provider?.location ??
+              "No location available"}
+          </span>
+        </div>
+      </PageSection>
+
+      <PageSection
+        title="Service Request"
+        description="Details supplied by the customer."
+      >
+        <div className="card stack-sm">
+          <div>
+            <strong>Issue Description</strong>
+
+            <p>
+              {booking.issue_description ||
+                "No issue description provided."}
+            </p>
+          </div>
+
+          <div>
+            <strong>Service Preference</strong>
+
+            <p>
+              {booking.service_preference ||
+                "Not specified"}
+            </p>
+          </div>
+        </div>
+      </PageSection>
+
+      <PageSection
+        title="Quote"
+        description="Quote information provided for this booking."
+      >
+        <div className="dashboard-grid">
+          <StatTile
+            title="Labour"
+            value={formatCurrency(
+              booking.quote_labour ?? 0
+            )}
+          />
+
+          <StatTile
+            title="Parts"
+            value={formatCurrency(
+              booking.quote_parts ?? 0
+            )}
+          />
+
+          <StatTile
+            title="Total"
+            value={formatCurrency(
+              booking.quote_total ?? 0
+            )}
+          />
+        </div>
+
+        {booking.quote_notes ? (
+          <div className="card">
+            <strong>Quote Notes</strong>
+            <p>{booking.quote_notes}</p>
+          </div>
+        ) : null}
+      </PageSection>
+
+      <PageSection
+        title="Attachments"
+        description="Files supplied with the booking."
+      >
+        {booking.attachment_url ? (
+          <div className="card">
+            <a
+              href={booking.attachment_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="button-secondary"
+            >
+              View Attachment
+            </a>
+          </div>
+        ) : (
+          <p className="muted">
+            No attachment was provided.
+          </p>
+        )}
+      </PageSection>
+    </>
+  );
+}

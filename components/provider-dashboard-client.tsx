@@ -80,14 +80,27 @@ export function ProviderDashboardClient() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    setState({
-      profile: null,
-      providerProfile: null,
-      bookings: []
-    });
-    setLoading(false);
-    return;
-  }
+  setState({
+    profile: null,
+    providerProfile: null,
+    bookings: [],
+
+    totalBookings: 0,
+    pendingBookings: 0,
+    confirmedBookings: 0,
+    rejectedBookings: 0,
+
+    completedBookings: 0,
+    totalRevenue: 0,
+    averageRating: 0,
+    reviewCount: 0,
+
+    notifications: [],
+  });
+
+  setLoading(false);
+  return;
+}
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -96,14 +109,27 @@ export function ProviderDashboardClient() {
     .single<ProfileRecord>();
 
   if (!profile || profile.role !== "provider") {
-    setState({
-      profile,
-      providerProfile: null,
-      bookings: []
-    });
-    setLoading(false);
-    return;
-  }
+  setState({
+    profile,
+    providerProfile: null,
+    bookings: [],
+
+    totalBookings: 0,
+    pendingBookings: 0,
+    confirmedBookings: 0,
+    rejectedBookings: 0,
+
+    completedBookings: 0,
+    totalRevenue: 0,
+    averageRating: 0,
+    reviewCount: 0,
+
+    notifications: [],
+  });
+
+  setLoading(false);
+  return;
+}
 
   const { data: providerProfile } = await supabase
     .from("provider_profiles")

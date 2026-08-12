@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { ReactNode } from "react";
+import type { Route } from "next";
 
 type QuickActionCardProps = {
   title: string;
   description: string;
-  href: string;
+  href: Route;
   actionLabel?: string;
   icon?: ReactNode;
 };

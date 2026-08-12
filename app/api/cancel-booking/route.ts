@@ -31,14 +31,18 @@ export async function POST(request: Request) {
     .eq("id", bookingId);
 
   // Notify provider
-  if (booking.provider?.contact_email) {
-    await sendNotification({
-      to: booking.provider.contact_email,
-      subject: "Booking cancelled",
-      html: `<p>A customer has cancelled their appointment.</p>`,
-      text: "A customer cancelled their appointment."
-    });
-  }
+  const provider = Array.isArray(booking.provider)
+  ? booking.provider[0]
+  : booking.provider;
+
+if (provider?.contact_email) {
+  await sendNotification({
+    to: provider.contact_email,
+    subject: "Booking cancelled",
+    html: `<p>A customer has cancelled their appointment.</p>`,
+    text: "A customer cancelled their appointment."
+  });
+}
 
   redirect("/customer");
 }

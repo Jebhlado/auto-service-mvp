@@ -47,11 +47,11 @@ export default function RevenueTrendChart({
       <YAxis />
 
       <Tooltip
-        formatter={(value: number) => [
-          `R ${value.toLocaleString()}`,
-          "Revenue",
-        ]}
-      />
+     formatter={(value) => [
+    `R ${Number(value ?? 0).toLocaleString()}`,
+    "Revenue",
+    ]}
+    />
 
       <Line
         type="monotone"

@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { ReactNode } from "react";
+import type { Route } from "next";
 
 type StatTileProps = {
   title: string;
   value: ReactNode;
   icon?: ReactNode;
   subtitle?: ReactNode;
-  href?: string;
+  href?: Route;
 };
 
 export default function StatTile({
