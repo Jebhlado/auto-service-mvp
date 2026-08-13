@@ -20,9 +20,13 @@ export async function updateProviderApprovalAction(formData: FormData) {
   const { error } = await supabase
     .from("provider_profiles")
     .update({
-      approval_status: status,
-      approved_at: status === "approved" ? new Date().toISOString() : null
-    })
+  approval_status: status,
+  is_active: status === "approved",
+  approved_at:
+    status === "approved"
+      ? new Date().toISOString()
+      : null
+})
     .eq("user_id", providerId);
 
   if (error) {

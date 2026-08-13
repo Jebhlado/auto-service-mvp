@@ -441,7 +441,7 @@ await loadDashboard();
       </div>
 
       {onboarding &&
-        state.providerProfile?.approval_status !== "approved" ? (
+      state.providerProfile?.approval_status === "pending" ? (
           <div className="card">
             <strong>Complete your provider registration</strong>
             <p className="muted">
