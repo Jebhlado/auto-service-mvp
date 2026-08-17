@@ -44,8 +44,11 @@ export type BookingRecord = {
 
   provider_notes?: string | null;
 
-  quote_labour?: number | null;
-  quote_parts?: number | null;
+  quote_service_price?: number | null;
+  quote_callout_fee?: number | null;
+  quote_estimated_time?: string | null;
+  quote_warranty?: string | null;
+
   quote_total?: number | null;
   quote_notes?: string | null;
   quote_status?: string | null;

@@ -202,19 +202,43 @@ if (user) {
     <strong>Quote Received</strong>
 
     <p>
-      Labour: R{booking.quote_labour ?? 0}
+      <strong>Service Price:</strong>{" "}
+      R{booking.quote_service_price ?? 0}
     </p>
 
-    <p>
-      Parts: R{booking.quote_parts ?? 0}
-    </p>
+    {(booking.quote_callout_fee ?? 0) > 0 ? (
+      <p>
+        <strong>Call-out Fee:</strong>{" "}
+        R{booking.quote_callout_fee ?? 0}
+      </p>
+    ) : (
+      <p>
+        <strong>Call-out Fee:</strong> R0
+      </p>
+    )}
 
     <p>
-      Total: R{booking.quote_total ?? 0}
+      <strong>Total:</strong>{" "}
+      R{booking.quote_total ?? 0}
     </p>
 
+    {booking.quote_estimated_time ? (
+      <p>
+        <strong>Estimated Time:</strong>{" "}
+        {booking.quote_estimated_time}
+      </p>
+    ) : null}
+
+    {booking.quote_warranty ? (
+      <p>
+        <strong>Warranty:</strong>{" "}
+        {booking.quote_warranty}
+      </p>
+    ) : null}
+
     <p>
-      Notes: {booking.quote_notes ?? "None"}
+      <strong>Notes:</strong>{" "}
+      {booking.quote_notes ?? "None"}
     </p>
 
     <form action={updateQuoteStatus}>

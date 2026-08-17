@@ -63,11 +63,20 @@ export function ProviderDashboardClient() {
   Record<string, string>
   >({});
 
-  const [quoteLabour, setQuoteLabour] = useState<Record<string, string>>({});
+  const [quoteServicePrice, setQuoteServicePrice] =
+    useState<Record<string, string>>({});
 
-  const [quoteParts, setQuoteParts] = useState<Record<string, string>>({});
+  const [quoteCalloutFee, setQuoteCalloutFee] =
+    useState<Record<string, string>>({});
 
-  const [quoteNotes, setQuoteNotes] = useState<Record<string, string>>({});
+  const [quoteEstimatedTime, setQuoteEstimatedTime] =
+    useState<Record<string, string>>({});
+
+  const [quoteWarranty, setQuoteWarranty] =
+    useState<Record<string, string>>({});
+
+  const [quoteNotes, setQuoteNotes] =
+    useState<Record<string, string>>({});
 
   const onboarding = searchParams.get("onboarding") === "1";
   
@@ -347,42 +356,57 @@ await loadDashboard();
   }
 
   async function handleSendQuote(
-  bookingId: string
-) {
-  const labour = Number(
-    quoteLabour[bookingId] ?? 0
-  );
+    bookingId: string
+  ) {
+    const servicePrice = Number(
+      quoteServicePrice[bookingId] ?? 0
+    );
 
-  const parts = Number(
-    quoteParts[bookingId] ?? 0
-  );
+    const calloutFee = Number(
+      quoteCalloutFee[bookingId] ?? 0
+    );
 
-  const total = labour + parts;
+    if (!Number.isFinite(servicePrice) || servicePrice <= 0) {
+      setError("Service Price must be greater than R0.");
+      return;
+    }
 
-  const supabase = createClient();
+    if (!Number.isFinite(calloutFee) || calloutFee < 0) {
+      setError("Call-out Fee cannot be negative.");
+      return;
+    }
 
-  const { error } = await supabase
-    .from("bookings")
-    .update({
-      quote_labour: labour,
-      quote_parts: parts,
-      quote_total: total,
-      quote_notes:
-        quoteNotes[bookingId] ?? "",
-      quote_status: "quote_sent",
-      quote_sent_at:
-        new Date().toISOString()
-    })
-    .eq("id", bookingId);
+    const total = servicePrice + calloutFee;
 
-  if (error) {
-    setError(error.message);
-    return;
+    const supabase = createClient();
+
+    const { error } = await supabase
+      .from("bookings")
+      .update({
+        quote_service_price: servicePrice,
+        quote_callout_fee: calloutFee,
+        quote_estimated_time:
+          quoteEstimatedTime[bookingId] ?? "",
+        quote_warranty:
+          quoteWarranty[bookingId] ?? "",
+        quote_total: total,
+        quote_notes:
+          quoteNotes[bookingId] ?? "",
+        quote_status: "quote_sent",
+        quote_sent_at:
+          new Date().toISOString()
+      })
+      .eq("id", bookingId);
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
+    setError(null);
+    setFeedback("Quote sent successfully.");
+    await loadDashboard();
   }
-
-  setFeedback("Quote sent successfully.");
-  await loadDashboard();
-}
 
   if (loading) {
     return (
@@ -721,11 +745,13 @@ await loadDashboard();
 
               <input
                 type="number"
-                placeholder="Labour Cost (R)"
-                value={quoteLabour[booking.id] ?? ""}
+                min="0"
+                step="0.01"
+                placeholder="Service Price (R)"
+                value={quoteServicePrice[booking.id] ?? ""}
                 onChange={(e) =>
-                  setQuoteLabour({
-                    ...quoteLabour,
+                  setQuoteServicePrice({
+                    ...quoteServicePrice,
                     [booking.id]: e.target.value
                   })
                 }
@@ -733,11 +759,37 @@ await loadDashboard();
 
               <input
                 type="number"
-                placeholder="Parts Cost (R)"
-                value={quoteParts[booking.id] ?? ""}
+                min="0"
+                step="0.01"
+                placeholder="Call-out Fee (R)"
+                value={quoteCalloutFee[booking.id] ?? ""}
                 onChange={(e) =>
-                  setQuoteParts({
-                    ...quoteParts,
+                  setQuoteCalloutFee({
+                    ...quoteCalloutFee,
+                    [booking.id]: e.target.value
+                  })
+                }
+              />
+
+              <input
+                type="text"
+                placeholder="Estimated Time (e.g. 2 hours)"
+                value={quoteEstimatedTime[booking.id] ?? ""}
+                onChange={(e) =>
+                  setQuoteEstimatedTime({
+                    ...quoteEstimatedTime,
+                    [booking.id]: e.target.value
+                  })
+                }
+              />
+
+              <input
+                type="text"
+                placeholder="Warranty (e.g. 6 months on fitted parts)"
+                value={quoteWarranty[booking.id] ?? ""}
+                onChange={(e) =>
+                  setQuoteWarranty({
+                    ...quoteWarranty,
                     [booking.id]: e.target.value
                   })
                 }

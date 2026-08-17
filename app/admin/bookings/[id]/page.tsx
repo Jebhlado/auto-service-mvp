@@ -141,16 +141,16 @@ export default async function BookingDetailsPage({
       >
         <div className="dashboard-grid">
           <StatTile
-            title="Labour"
+            title="Service Price"
             value={formatCurrency(
-              booking.quote_labour ?? 0
+              booking.quote_service_price ?? 0
             )}
           />
 
           <StatTile
-            title="Parts"
+            title="Call-out Fee"
             value={formatCurrency(
-              booking.quote_parts ?? 0
+              booking.quote_callout_fee ?? 0
             )}
           />
 
@@ -159,6 +159,16 @@ export default async function BookingDetailsPage({
             value={formatCurrency(
               booking.quote_total ?? 0
             )}
+          />
+
+          <StatTile
+            title="Estimated Time"
+            value={booking.quote_estimated_time || "Not specified"}
+          />
+
+          <StatTile
+            title="Warranty"
+            value={booking.quote_warranty || "Not specified"}
           />
         </div>
 
