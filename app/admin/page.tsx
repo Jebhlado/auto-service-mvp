@@ -7,8 +7,8 @@ import type { BookingRecord, ProfileRecord, ProviderProfileRecord } from "@/lib/
 import PageSection from "@/components/ui/PageSection";
 import KpiGrid from "@/components/ui/layout/KpiGrid";
 import { buildDashboardStats } from "@/app/admin/lib/dashboard";
-import { getBookingAttachmentUrl } from "@/lib/attachments";
-import { getBookingAttachmentUrl } from "@/lib/attachments";
+
+
 import QuickActionsGrid from "@/components/ui/layout/QuickActionsGrid";
 import QuickActionCard from "@/components/ui/QuickActionCard";
 import StatTile from "@/components/ui/StatTile";
@@ -623,7 +623,7 @@ const { count: totalProviders } =
     : "Not specified"}
 </p>
 
-{booking.attachment_url ? (
+{booking.attachmentUrl ? (
   <p>
     <strong>Attachment:</strong>{" "}
     <a

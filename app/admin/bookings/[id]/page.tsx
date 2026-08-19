@@ -189,7 +189,7 @@ export default async function BookingDetailsPage({
         title="Attachments"
         description="Files supplied with the booking."
       >
-        {booking.attachment_url ? (
+        {attachmentUrl ? (
           <div className="card">
             <a
               href={attachmentUrl}

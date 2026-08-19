@@ -71,7 +71,7 @@ if (user) {
   ? await supabase
       .from("reviews")
       .select(
-        "booking_id, rating, review_text, created_at"
+        "booking_id, provider_id, rating, review_text, created_at"
       )
       .eq("customer_id", user.id)
   : { data: [] };

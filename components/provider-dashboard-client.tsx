@@ -9,10 +9,14 @@ import { GAUTENG_LOCATIONS, PROVIDER_SPECIALISTS } from "@/lib/provider-options"
 import { getBookingAttachmentPath } from "@/lib/attachment-path";
 import type { BookingRecord, ProfileRecord, ProviderProfileRecord } from "@/lib/types";
 
+type ProviderBookingRecord = BookingRecord & {
+  attachmentUrl: string | null;
+};
+
 type ProviderDashboardState = {
   profile: ProfileRecord | null;
   providerProfile: ProviderProfileRecord | null;
-  bookings: BookingRecord[];
+  bookings: ProviderBookingRecord[];
 
   totalBookings: number;
   pendingBookings: number;
@@ -268,7 +272,7 @@ const averageRating =
   setState({
   profile,
   providerProfile: providerProfile ?? null,
-  bookings: enrichedBookings as BookingRecord[],
+  bookings: enrichedBookings,
 
   notifications: notifications ?? [],
 
