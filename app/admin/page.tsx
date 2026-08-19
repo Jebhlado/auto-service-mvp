@@ -1,11 +1,14 @@
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { getBookingAttachmentUrl } from "@/lib/attachments";
 import { updateProviderApprovalAction, toggleProviderStatusAction, cancelBookingAction, markBookingResolvedAction } from "@/app/admin/actions";
 import { getPendingProviders, getProviders } from "@/app/admin/lib/admin";
 import type { BookingRecord, ProfileRecord, ProviderProfileRecord } from "@/lib/types";
 import PageSection from "@/components/ui/PageSection";
 import KpiGrid from "@/components/ui/layout/KpiGrid";
 import { buildDashboardStats } from "@/app/admin/lib/dashboard";
+import { getBookingAttachmentUrl } from "@/lib/attachments";
+import { getBookingAttachmentUrl } from "@/lib/attachments";
 import QuickActionsGrid from "@/components/ui/layout/QuickActionsGrid";
 import QuickActionCard from "@/components/ui/QuickActionCard";
 import StatTile from "@/components/ui/StatTile";
@@ -51,7 +54,7 @@ const { data: allCustomers } = await supabase
   let bookingsQuery = supabase
   .from("bookings")
   .select(
-    "id, customer_id, provider_id, appointment_date, issue_description, status, created_at, quote_total, customer:profiles(full_name, phone), provider:provider_profiles!bookings_provider_id_fkey(business_name, location)"
+    "id, customer_id, provider_id, appointment_date, issue_description, status, created_at, quote_total, attachment_url, customer:profiles(full_name, phone), provider:provider_profiles!bookings_provider_id_fkey(business_name, location)"
   );
 
 if (bookingStatus !== "all") {
@@ -67,7 +70,16 @@ const { data: bookings } =
     .order("created_at", {
       ascending: false
     });
-    const { count: totalCustomers } =
+      const bookingsWithAttachments = await Promise.all(
+    (bookings ?? []).map(async (booking) => ({
+      ...booking,
+      attachmentUrl: booking.attachment_url
+        ? await getBookingAttachmentUrl(booking.id)
+        : null,
+    }))
+  );
+
+const { count: totalCustomers } =
   await supabase
     .from("profiles")
     .select("*", {
@@ -576,8 +588,8 @@ const { count: totalProviders } =
   </button>
 </form>
 </div>
-          {bookings?.length ? (
-            bookings.map((booking) => (
+          {bookingsWithAttachments.length ? (
+            bookingsWithAttachments.map((booking) => (
               <article key={booking.id} className="card stack-sm">
                 <div className="split-row">
                   <strong>{booking.provider?.business_name ?? "Provider"}</strong>
@@ -615,7 +627,7 @@ const { count: totalProviders } =
   <p>
     <strong>Attachment:</strong>{" "}
     <a
-      href={booking.attachment_url}
+      href={booking.attachmentUrl}
       target="_blank"
       rel="noopener noreferrer"
     >

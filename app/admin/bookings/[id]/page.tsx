@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { getBookings } from "@/app/admin/lib/admin";
 import { formatCurrency } from "@/lib/formats";
+import { getBookingAttachmentUrl } from "@/lib/attachments";
 import PanelHeader from "@/components/ui/PanelHeader";
 import PageSection from "@/components/ui/PageSection";
 import StatTile from "@/components/ui/StatTile";
@@ -27,6 +28,10 @@ export default async function BookingDetailsPage({
   if (!booking) {
     notFound();
   }
+
+  const attachmentUrl = booking.attachment_url
+    ? await getBookingAttachmentUrl(booking.id)
+    : null;
 
   return (
     <>
@@ -187,7 +192,7 @@ export default async function BookingDetailsPage({
         {booking.attachment_url ? (
           <div className="card">
             <a
-              href={booking.attachment_url}
+              href={attachmentUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="button-secondary"

@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { markJobComplete } from "@/app/provider/actions";
 import { GAUTENG_LOCATIONS, PROVIDER_SPECIALISTS } from "@/lib/provider-options";
+import { getBookingAttachmentPath } from "@/lib/attachment-path";
 import type { BookingRecord, ProfileRecord, ProviderProfileRecord } from "@/lib/types";
 
 type ProviderDashboardState = {
@@ -176,16 +177,41 @@ export function ProviderDashboardClient() {
   console.log("CUSTOMERS:", customers);
 
   const enrichedBookings =
-    bookings?.map((booking) => ({
-      ...booking,
-      customer:
-        customers?.find(
-          (customer) => customer.id === booking.customer_id
-        ) ?? null
-    })) ?? [];
-    
+    await Promise.all(
+      (bookings ?? []).map(async (booking) => {
+        let attachmentUrl: string | null = null;
 
-    const totalBookings = enrichedBookings.length;
+        const attachmentPath =
+          getBookingAttachmentPath(
+            booking.attachment_url
+          );
+
+        if (attachmentPath) {
+          const { data: signedAttachment } =
+            await supabase.storage
+              .from("booking-attachments")
+              .createSignedUrl(
+                attachmentPath,
+                60 * 10
+              );
+
+          attachmentUrl =
+            signedAttachment?.signedUrl ?? null;
+        }
+
+        return {
+          ...booking,
+          attachmentUrl,
+          customer:
+            customers?.find(
+              (customer) =>
+                customer.id === booking.customer_id
+            ) ?? null
+        };
+      })
+    );
+
+  const totalBookings = enrichedBookings.length;
 
 const pendingBookings =
   enrichedBookings.filter(
@@ -665,14 +691,14 @@ await loadDashboard();
                     : "Not specified"}
                 </p>
 
-                {booking.attachment_url ? (
+                {booking.attachmentUrl ? (
                   <div>
                     <strong>Attachment:</strong>
 
                     <br />
 
                     <a
-                      href={booking.attachment_url}
+                      href={booking.attachmentUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="button-secondary"

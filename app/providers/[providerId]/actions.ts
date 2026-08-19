@@ -19,19 +19,39 @@ export async function createBookingAction(formData: FormData) {
 
   const attachment = formData.get("attachment") as File | null;
 
-  console.log("providerId =", providerId);
-  console.log("appointmentDate =", appointmentDate);
-  console.log("issueDescription =", issueDescription);
-  console.log("servicePreference =", servicePreference);
-
   const supabase = await createClient();
 
   let attachmentUrl: string | null = null;
 
   if (attachment && attachment.size > 0) {
-    console.log("Attachment found:", attachment.name);
+    const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 
-    const fileName = `${Date.now()}-${attachment.name}`;
+    const allowedMimeTypes = new Set([
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "application/pdf"
+    ]);
+
+    if (attachment.size > MAX_ATTACHMENT_SIZE) {
+      throw new Error("Attachment must be 10 MB or smaller.");
+    }
+
+    if (!allowedMimeTypes.has(attachment.type)) {
+      throw new Error(
+        "Invalid attachment type. Please upload a JPG, PNG, WEBP, or PDF file."
+      );
+    }
+
+    const extensionByMimeType: Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+      "application/pdf": "pdf"
+    };
+
+    const extension = extensionByMimeType[attachment.type];
+    const fileName = `${crypto.randomUUID()}.${extension}`;
 
     const arrayBuffer = await attachment.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -39,20 +59,19 @@ export async function createBookingAction(formData: FormData) {
     const { error: uploadError } = await supabase.storage
       .from("booking-attachments")
       .upload(fileName, buffer, {
-        contentType: attachment.type
+        contentType: attachment.type,
+        upsert: false
       });
 
     if (uploadError) {
-      console.error("UPLOAD ERROR:", uploadError);
-    } else {
-      const { data } = supabase.storage
-        .from("booking-attachments")
-        .getPublicUrl(fileName);
-
-      attachmentUrl = data.publicUrl;
-
-      console.log("UPLOAD SUCCESS:", attachmentUrl);
+      throw new Error("Attachment upload failed.");
     }
+
+    const { data } = supabase.storage
+      .from("booking-attachments")
+      .getPublicUrl(fileName);
+
+    attachmentUrl = data.publicUrl;
   }
 
   const { error } = await supabase.from("bookings").insert({
@@ -74,10 +93,10 @@ export async function createBookingAction(formData: FormData) {
   }
 
   await createNotification(
-  providerId,
-  "New Booking",
-  `${profile.full_name} submitted a new booking request.`
-);
+    providerId,
+    "New Booking",
+    `${profile.full_name} submitted a new booking request.`
+  );
 
   const { data: provider } = await supabase
     .from("provider_profiles")
@@ -98,4 +117,5 @@ export async function createBookingAction(formData: FormData) {
   }
 
   redirect("/customer?success=booking-created");
+}
 }

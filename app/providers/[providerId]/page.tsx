@@ -248,7 +248,7 @@ const averageRating =
             <input
               type="file"
               name="attachment"
-              accept="image/*,video/*"
+              accept="image/jpeg,image/png,image/webp,application/pdf"
             />
 
             <button

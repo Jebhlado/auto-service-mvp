@@ -7,6 +7,7 @@ import {
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatServices } from "@/lib/utils";
+import { getBookingAttachmentUrl } from "@/lib/attachments";
 import type { ProviderProfileRecord } from "@/lib/types";
 
 type CustomerPageProps = {
@@ -66,9 +67,32 @@ if (user) {
   const { data } = await query.order("updated_at", { ascending: false });
   const providers = (data ?? []) as ProviderProfileRecord[];
 
-  const { data: reviews } = await supabase
-  .from("reviews")
-  .select("*");
+  const { data: reviews } = user
+  ? await supabase
+      .from("reviews")
+      .select(
+        "booking_id, rating, review_text, created_at"
+      )
+      .eq("customer_id", user.id)
+  : { data: [] };
+
+const reviewByBookingId = new Map(
+  (reviews ?? []).map((review) => [
+    review.booking_id,
+    review
+  ])
+);
+
+const bookingsWithAttachments = await Promise.all(
+  customerBookings.map(async (booking) => ({
+    ...booking,
+    attachmentUrl: booking.attachment_url
+      ? await getBookingAttachmentUrl(booking.id)
+      : null
+  }))
+);
+
+customerBookings = bookingsWithAttachments;
 
   return (
     <section className="section">
@@ -315,64 +339,96 @@ if (user) {
 ) : null}
 
 {booking.status === "closed" ? (
-  <div className="card">
-    <strong>Rate Your Experience</strong>
+  (() => {
+    const existingReview =
+      reviewByBookingId.get(booking.id);
 
-    <form action={createReview}>
-      <input
-        type="hidden"
-        name="bookingId"
-        value={booking.id}
-      />
+    return existingReview ? (
+      <div className="card">
+        <strong>Review Submitted</strong>
 
-      <input
-        type="hidden"
-        name="providerId"
-        value={booking.provider_id}
-      />
+        <p>
+          <strong>Your Rating:</strong>{" "}
+          {"★".repeat(existingReview.rating)}
+          {"☆".repeat(5 - existingReview.rating)}
+        </p>
 
-      <select
-        name="rating"
-        required
-      >
-        <option value="">
-          Select Rating
-        </option>
-        <option value="5">
-          ★★★★★
-        </option>
-        <option value="4">
-          ★★★★
-        </option>
-        <option value="3">
-          ★★★
-        </option>
-        <option value="2">
-          ★★
-        </option>
-        <option value="1">
-          ★
-        </option>
-      </select>
+        {existingReview.review_text ? (
+          <p>
+            <strong>Your Review:</strong>{" "}
+            {existingReview.review_text}
+          </p>
+        ) : (
+          <p className="muted">
+            You submitted a rating without written
+            feedback.
+          </p>
+        )}
 
-      <textarea
-        name="review"
-        placeholder="Tell others about your experience..."
-      />
+        <p className="muted">
+          Thank you for sharing your experience.
+        </p>
+      </div>
+    ) : (
+      <div className="card">
+        <strong>Rate Your Experience</strong>
 
-      <button
-        type="submit"
-        className="button-primary"
-      >
-        Submit Review
-      </button>
-    </form>
-  </div>
+        <form action={createReview}>
+          <input
+            type="hidden"
+            name="bookingId"
+            value={booking.id}
+          />
+
+          <select
+            name="rating"
+            required
+          >
+            <option value="">
+              Select Rating
+            </option>
+
+            <option value="5">
+              ★★★★★
+            </option>
+
+            <option value="4">
+              ★★★★
+            </option>
+
+            <option value="3">
+              ★★★
+            </option>
+
+            <option value="2">
+              ★★
+            </option>
+
+            <option value="1">
+              ★
+            </option>
+          </select>
+
+          <textarea
+            name="review"
+            placeholder="Tell others about your experience..."
+          />
+
+          <button
+            type="submit"
+            className="button-primary"
+          >
+            Submit Review
+          </button>
+        </form>
+      </div>
+    );
+  })()
 ) : null}
 
-{booking.attachment_url ? (
+{booking.attachmentUrl ? (
   <a
-    href={booking.attachment_url}
+    href={booking.attachmentUrl}
     target="_blank"
     rel="noreferrer"
     className="button-secondary"
