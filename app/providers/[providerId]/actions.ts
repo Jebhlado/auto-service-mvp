@@ -118,4 +118,3 @@ export async function createBookingAction(formData: FormData) {
 
   redirect("/customer?success=booking-created");
 }
-}
