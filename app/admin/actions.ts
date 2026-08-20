@@ -91,17 +91,20 @@ export async function cancelBookingAction(
     formData.get("bookingId") ?? ""
   );
 
-  const { error } = await supabase
+  const { data: updatedBooking, error } = await supabase
     .from("bookings")
     .update({
       status: "cancelled"
     })
-    .eq("id", bookingId);
+    .eq("id", bookingId)
+    .in("status", ["pending", "confirmed"])
+    .select("id")
+    .maybeSingle();
 
-  if (error) {
+  if (error || !updatedBooking) {
     redirect(
       `/admin?error=${encodeURIComponent(
-        error.message
+        error?.message ?? "Booking cannot be cancelled from its current status."
       )}`
     );
   }
@@ -122,17 +125,20 @@ export async function confirmBookingAction(
     formData.get("bookingId") ?? ""
   );
 
-  const { error } = await supabase
+  const { data: updatedBooking, error } = await supabase
     .from("bookings")
     .update({
       status: "confirmed",
     })
-    .eq("id", bookingId);
+    .eq("id", bookingId)
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle();
 
-  if (error) {
+  if (error || !updatedBooking) {
     redirect(
       `/admin?error=${encodeURIComponent(
-        error.message
+        error?.message ?? "Booking cannot be confirmed from its current status."
       )}`
     );
   }
@@ -153,17 +159,20 @@ export async function startBookingAction(
     formData.get("bookingId") ?? ""
   );
 
-  const { error } = await supabase
+  const { data: updatedBooking, error } = await supabase
     .from("bookings")
     .update({
       status: "in_progress",
     })
-    .eq("id", bookingId);
+    .eq("id", bookingId)
+    .eq("status", "confirmed")
+    .select("id")
+    .maybeSingle();
 
-  if (error) {
+  if (error || !updatedBooking) {
     redirect(
       `/admin?error=${encodeURIComponent(
-        error.message
+        error?.message ?? "Booking cannot be started from its current status."
       )}`
     );
   }
@@ -184,17 +193,20 @@ export async function completeBookingAction(
     formData.get("bookingId") ?? ""
   );
 
-  const { error } = await supabase
+  const { data: updatedBooking, error } = await supabase
     .from("bookings")
     .update({
       status: "completed",
     })
-    .eq("id", bookingId);
+    .eq("id", bookingId)
+    .eq("status", "in_progress")
+    .select("id")
+    .maybeSingle();
 
-  if (error) {
+  if (error || !updatedBooking) {
     redirect(
       `/admin?error=${encodeURIComponent(
-        error.message
+        error?.message ?? "Booking cannot be completed from its current status."
       )}`
     );
   }
@@ -215,24 +227,25 @@ export async function markBookingResolvedAction(
     formData.get("bookingId") ?? ""
   );
 
-  const { error } = await supabase
+  const { data: updatedBooking, error } = await supabase
     .from("bookings")
     .update({
       status: "closed"
     })
-    .eq("id", bookingId);
+    .eq("id", bookingId)
+    .eq("status", "completed")
+    .select("id")
+    .maybeSingle();
 
-  if (error) {
+  if (error || !updatedBooking) {
     redirect(
       `/admin?error=${encodeURIComponent(
-        error.message
+        error?.message ?? "Booking cannot be resolved from its current status."
       )}`
     );
   }
 
   redirect(
-  `/admin/bookings/${bookingId}?success=booking-resolved`
-);
+    `/admin/bookings/${bookingId}?success=booking-resolved`
+  );
 }
-
-
