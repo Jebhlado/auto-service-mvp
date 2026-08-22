@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { markJobComplete } from "@/app/provider/actions";
+import {
+  markJobComplete,
+  sendQuoteAction
+} from "@/app/provider/actions";
 import { GAUTENG_LOCATIONS, PROVIDER_SPECIALISTS } from "@/lib/provider-options";
 import { getBookingAttachmentPath } from "@/lib/attachment-path";
 import type { BookingRecord, ProfileRecord, ProviderProfileRecord } from "@/lib/types";
@@ -406,36 +409,37 @@ await loadDashboard();
       return;
     }
 
-    const total = servicePrice + calloutFee;
+    const formData = new FormData();
 
-    const supabase = createClient();
+    formData.set("bookingId", bookingId);
+    formData.set("servicePrice", String(servicePrice));
+    formData.set("calloutFee", String(calloutFee));
+    formData.set(
+      "estimatedTime",
+      quoteEstimatedTime[bookingId] ?? ""
+    );
+    formData.set(
+      "warranty",
+      quoteWarranty[bookingId] ?? ""
+    );
+    formData.set(
+      "quoteNotes",
+      quoteNotes[bookingId] ?? ""
+    );
 
-    const { error } = await supabase
-      .from("bookings")
-      .update({
-        quote_service_price: servicePrice,
-        quote_callout_fee: calloutFee,
-        quote_estimated_time:
-          quoteEstimatedTime[bookingId] ?? "",
-        quote_warranty:
-          quoteWarranty[bookingId] ?? "",
-        quote_total: total,
-        quote_notes:
-          quoteNotes[bookingId] ?? "",
-        quote_status: "quote_sent",
-        quote_sent_at:
-          new Date().toISOString()
-      })
-      .eq("id", bookingId);
+    try {
+      await sendQuoteAction(formData);
 
-    if (error) {
-      setError(error.message);
-      return;
+      setError(null);
+      setFeedback("Quote sent successfully.");
+      await loadDashboard();
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to send quote."
+      );
     }
-
-    setError(null);
-    setFeedback("Quote sent successfully.");
-    await loadDashboard();
   }
 
   if (loading) {

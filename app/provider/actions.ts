@@ -180,6 +180,109 @@ export async function updateBookingStatusAction(
   revalidatePath("/customer");
 }
 
+export async function sendQuoteAction(
+  formData: FormData
+) {
+  const { user } = await requireRole(["provider"]);
+
+  const bookingId = String(
+    formData.get("bookingId") ?? ""
+  );
+
+  const servicePrice = Number(
+    formData.get("servicePrice") ?? 0
+  );
+
+  const calloutFee = Number(
+    formData.get("calloutFee") ?? 0
+  );
+
+  const estimatedTime = String(
+    formData.get("estimatedTime") ?? ""
+  );
+
+  const warranty = String(
+    formData.get("warranty") ?? ""
+  );
+
+  const quoteNotes = String(
+    formData.get("quoteNotes") ?? ""
+  );
+
+  if (!bookingId) {
+    throw new Error("Booking ID is required.");
+  }
+
+  if (!Number.isFinite(servicePrice) || servicePrice <= 0) {
+    throw new Error("Service Price must be greater than R0.");
+  }
+
+  if (!Number.isFinite(calloutFee) || calloutFee < 0) {
+    throw new Error("Call-out Fee cannot be negative.");
+  }
+
+  const total = servicePrice + calloutFee;
+
+  const supabase = await createClient();
+
+  const { data: booking, error: bookingError } =
+    await supabase
+      .from("bookings")
+      .select("id, provider_id, status, quote_status")
+      .eq("id", bookingId)
+      .eq("provider_id", user.id)
+      .single();
+
+  if (bookingError || !booking) {
+    throw new Error(
+      "Booking not found or access denied."
+    );
+  }
+
+  if (booking.status !== "confirmed") {
+    throw new Error(
+      "A quote can only be sent for a confirmed booking."
+    );
+  }
+
+  if (booking.quote_status === "quote_sent") {
+    throw new Error(
+      "A quote has already been sent for this booking."
+    );
+  }
+
+  const { data: updatedBooking, error } =
+    await supabase
+      .from("bookings")
+      .update({
+        quote_service_price: servicePrice,
+        quote_callout_fee: calloutFee,
+        quote_estimated_time: estimatedTime,
+        quote_warranty: warranty,
+        quote_total: total,
+        quote_notes: quoteNotes,
+        quote_status: "quote_sent",
+        quote_sent_at: new Date().toISOString()
+      })
+      .eq("id", bookingId)
+      .eq("provider_id", user.id)
+      .eq("status", "confirmed")
+      .neq("quote_status", "quote_sent")
+      .select("id")
+      .maybeSingle();
+
+  if (error || !updatedBooking) {
+    throw new Error(
+      error?.message ??
+        "Quote could not be sent from the current booking state."
+    );
+  }
+
+  revalidatePath("/provider");
+  revalidatePath("/dashboard/provider");
+  revalidatePath("/customer");
+}
+
 export async function markJobComplete(
   formData: FormData
 ) {
