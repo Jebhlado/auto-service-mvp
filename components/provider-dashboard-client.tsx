@@ -6,20 +6,16 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   markJobComplete,
-  sendQuoteAction
+  sendQuoteAction,
+  updateBookingStatusAction
 } from "@/app/provider/actions";
 import { GAUTENG_LOCATIONS, PROVIDER_SPECIALISTS } from "@/lib/provider-options";
-import { getBookingAttachmentPath } from "@/lib/attachment-path";
 import type { BookingRecord, ProfileRecord, ProviderProfileRecord } from "@/lib/types";
-
-type ProviderBookingRecord = BookingRecord & {
-  attachmentUrl: string | null;
-};
 
 type ProviderDashboardState = {
   profile: ProfileRecord | null;
   providerProfile: ProviderProfileRecord | null;
-  bookings: ProviderBookingRecord[];
+  bookings: BookingRecord[];
 
   totalBookings: number;
   pendingBookings: number;
@@ -72,19 +68,19 @@ export function ProviderDashboardClient() {
   >({});
 
   const [quoteServicePrice, setQuoteServicePrice] =
-    useState<Record<string, string>>({});
+  useState<Record<string, string>>({});
 
   const [quoteCalloutFee, setQuoteCalloutFee] =
-    useState<Record<string, string>>({});
+  useState<Record<string, string>>({});
 
   const [quoteEstimatedTime, setQuoteEstimatedTime] =
-    useState<Record<string, string>>({});
+  useState<Record<string, string>>({});
 
   const [quoteWarranty, setQuoteWarranty] =
-    useState<Record<string, string>>({});
+  useState<Record<string, string>>({});
 
   const [quoteNotes, setQuoteNotes] =
-    useState<Record<string, string>>({});
+  useState<Record<string, string>>({});
 
   const onboarding = searchParams.get("onboarding") === "1";
   
@@ -184,41 +180,16 @@ export function ProviderDashboardClient() {
   console.log("CUSTOMERS:", customers);
 
   const enrichedBookings =
-    await Promise.all(
-      (bookings ?? []).map(async (booking) => {
-        let attachmentUrl: string | null = null;
+    bookings?.map((booking) => ({
+      ...booking,
+      customer:
+        customers?.find(
+          (customer) => customer.id === booking.customer_id
+        ) ?? null
+    })) ?? [];
 
-        const attachmentPath =
-          getBookingAttachmentPath(
-            booking.attachment_url
-          );
 
-        if (attachmentPath) {
-          const { data: signedAttachment } =
-            await supabase.storage
-              .from("booking-attachments")
-              .createSignedUrl(
-                attachmentPath,
-                60 * 10
-              );
-
-          attachmentUrl =
-            signedAttachment?.signedUrl ?? null;
-        }
-
-        return {
-          ...booking,
-          attachmentUrl,
-          customer:
-            customers?.find(
-              (customer) =>
-                customer.id === booking.customer_id
-            ) ?? null
-        };
-      })
-    );
-
-  const totalBookings = enrichedBookings.length;
+    const totalBookings = enrichedBookings.length;
 
 const pendingBookings =
   enrichedBookings.filter(
@@ -275,7 +246,7 @@ const averageRating =
   setState({
   profile,
   providerProfile: providerProfile ?? null,
-  bookings: enrichedBookings,
+  bookings: enrichedBookings as BookingRecord[],
 
   notifications: notifications ?? [],
 
@@ -331,116 +302,114 @@ const averageRating =
     await loadDashboard();
   }
 
-  async function handleBookingStatus(bookingId: string, status: "confirmed" | "rejected") {
-    const supabase = createClient();
-    const { error: updateError } = await supabase
-      .from("bookings")
-      .update({ status })
-      .eq("id", bookingId);
-
-    if (updateError) {
-      setError(updateError.message);
-      return;
-    }
-
-    setError(null);
-    setFeedback(`Booking ${status === "confirmed" ? "accepted" : "rejected"} successfully.`);
-    await loadDashboard();
-  }
-
-  async function handleBookingNotes(
-  bookingId: string
-  ) {
-console.log("Booking ID:", bookingId);
-console.log(
-  "Note:",
-  bookingNotes[bookingId]
-);
+  async function handleBookingNotes(bookingId: string) {
   const supabase = createClient();
 
-  const { data, error } = await supabase
-  .from("bookings")
-  .update({
-  provider_notes:
-  bookingNotes[bookingId] ?? ""
-  })
-  .eq("id", bookingId)
-  .select();
-
-  console.log("Result:", data);
-  console.log("Error:", error);
+  const { error } = await supabase
+    .from("bookings")
+    .update({
+      provider_notes: bookingNotes[bookingId] ?? ""
+    })
+    .eq("id", bookingId);
 
   if (error) {
-  setError(error.message);
-  return;
+    setError(error.message);
+    return;
   }
-  
 
- setFeedback(
-  "Provider notes saved successfully."
-);
+  setError(null);
+  setFeedback("Provider notes saved successfully.");
 
-setSavedNotes({
-  ...savedNotes,
-  [bookingId]: true
-});
+  setSavedNotes((current) => ({
+    ...current,
+    [bookingId]: true
+  }));
 
-await loadDashboard();
-  }
+  await loadDashboard();
+}
 
   async function handleSendQuote(
-    bookingId: string
-  ) {
-    const servicePrice = Number(
-      quoteServicePrice[bookingId] ?? 0
-    );
+  bookingId: string
+) {
+  const servicePrice = Number(
+    quoteServicePrice[bookingId] ?? 0
+  );
 
-    const calloutFee = Number(
-      quoteCalloutFee[bookingId] ?? 0
-    );
+  const calloutFee = Number(
+    quoteCalloutFee[bookingId] ?? 0
+  );
 
-    if (!Number.isFinite(servicePrice) || servicePrice <= 0) {
-      setError("Service Price must be greater than R0.");
-      return;
-    }
-
-    if (!Number.isFinite(calloutFee) || calloutFee < 0) {
-      setError("Call-out Fee cannot be negative.");
-      return;
-    }
-
-    const formData = new FormData();
-
-    formData.set("bookingId", bookingId);
-    formData.set("servicePrice", String(servicePrice));
-    formData.set("calloutFee", String(calloutFee));
-    formData.set(
-      "estimatedTime",
-      quoteEstimatedTime[bookingId] ?? ""
-    );
-    formData.set(
-      "warranty",
-      quoteWarranty[bookingId] ?? ""
-    );
-    formData.set(
-      "quoteNotes",
-      quoteNotes[bookingId] ?? ""
-    );
-
-    try {
-      await sendQuoteAction(formData);
-
-      setError(null);
-      setFeedback("Quote sent successfully.");
-      await loadDashboard();
-    } catch (error) {
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to send quote."
-      );
-    }
+  if (servicePrice <= 0) {
+    setError("Please enter a service price.");
+    return;
   }
+
+  if (calloutFee < 0) {
+    setError("Call-out fee cannot be negative.");
+    return;
+  }
+
+  const total = servicePrice + calloutFee;
+
+  const formData = new FormData();
+
+  formData.set("bookingId", bookingId);
+  formData.set("servicePrice", String(servicePrice));
+  formData.set("calloutFee", String(calloutFee));
+  formData.set(
+    "estimatedTime",
+    quoteEstimatedTime[bookingId] ?? ""
+  );
+  formData.set(
+    "warranty",
+    quoteWarranty[bookingId] ?? ""
+  );
+  formData.set(
+    "quoteNotes",
+    quoteNotes[bookingId] ?? ""
+  );
+
+  try {
+  const result = await sendQuoteAction(formData);
+
+  if (!result.success) {
+    setError(result.message);
+    return;
+  }
+
+  setState((currentState) => ({
+
+      ...currentState,
+      bookings: currentState.bookings.map((booking) =>
+        booking.id === bookingId
+          ? {
+              ...booking,
+              quote_service_price: servicePrice,
+              quote_callout_fee: calloutFee,
+              quote_total: total,
+              quote_estimated_time:
+                quoteEstimatedTime[bookingId] ?? "",
+              quote_warranty:
+                quoteWarranty[bookingId] ?? "",
+              quote_notes:
+                quoteNotes[bookingId] ?? "",
+              quote_status: "quote_sent",
+              quote_sent_at: new Date().toISOString()
+            }
+          : booking
+      )
+    }));
+
+    setError(null);
+    setFeedback("Quote sent successfully.");
+  } catch (error) {
+    setError(
+      error instanceof Error
+        ? error.message
+        : "Failed to send quote."
+    );
+  }
+}
 
   if (loading) {
     return (
@@ -699,14 +668,14 @@ await loadDashboard();
                     : "Not specified"}
                 </p>
 
-                {booking.attachmentUrl ? (
+                {booking.attachment_url ? (
                   <div>
                     <strong>Attachment:</strong>
 
                     <br />
 
                     <a
-                      href={booking.attachmentUrl}
+                      href={booking.attachment_url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="button-secondary"
@@ -748,163 +717,208 @@ await loadDashboard();
                 </button>
 
               </div>
-
+              
               {booking.status === "closed" ? (
-              <div className="card">
-                <strong>Job Closed</strong>
-
-                <p>
-                  Total: R{booking.quote_total ?? 0}
-                </p>
-
-                <p>
-                  Customer has confirmed completion.
-                </p>
-              </div>
-              ) : booking.quote_status === "quote_sent" ? (
                 <div className="card">
-                  <strong>Quote Sent</strong>
+                  <strong>Job Closed</strong>
 
                   <p>
                     Total: R{booking.quote_total ?? 0}
                   </p>
 
                   <p>
+                    Customer has confirmed completion.
+                  </p>
+                </div>
+              ) : booking.status === "completed" ? (
+                null
+              ) : booking.status === "rejected" ||
+                booking.status === "cancelled" ? (
+                null
+              ) : booking.quote_status === "quote_sent" &&
+                booking.status === "in_progress" ? (
+                <div className="card">
+                  <strong>Accepted Quote</strong>
+
+                  <p>
+                    Service Price: R{booking.quote_service_price ?? 0}
+                  </p>
+
+                  <p>
+                    Call-out Fee: R{booking.quote_callout_fee ?? 0}
+                  </p>
+
+                  <p>
+                    Total: R{booking.quote_total ?? 0}
+                  </p>
+
+                  {booking.quote_estimated_time ? (
+                    <p>
+                      Estimated Time: {booking.quote_estimated_time}
+                    </p>
+                  ) : null}
+
+                  {booking.quote_warranty ? (
+                    <p>
+                      Warranty: {booking.quote_warranty}
+                    </p>
+                  ) : null}
+
+                  <p>
+                    Customer accepted this quote. Job is in progress.
+                  </p>
+                </div>
+              ) : booking.quote_status === "quote_sent" ? (
+                <div className="card">
+                  <strong>Quote Sent</strong>
+
+                  <p>
+                    Service Price: R{booking.quote_service_price ?? 0}
+                  </p>
+
+                  <p>
+                    Call-out Fee: R{booking.quote_callout_fee ?? 0}
+                  </p>
+
+                  <p>
+                    Total: R{booking.quote_total ?? 0}
+                  </p>
+
+                  {booking.quote_estimated_time ? (
+                    <p>
+                      Estimated Time: {booking.quote_estimated_time}
+                    </p>
+                  ) : null}
+
+                  {booking.quote_warranty ? (
+                    <p>
+                      Warranty: {booking.quote_warranty}
+                    </p>
+                  ) : null}
+
+                  <p>
                     Waiting for customer approval.
                   </p>
                 </div>
-              ) : (
+              ) : booking.status === "confirmed" ? (
                 <div className="stack-sm">
-              <strong>Quote Details</strong>
+                  <strong>Quote Details</strong>
 
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="Service Price (R)"
-                value={quoteServicePrice[booking.id] ?? ""}
-                onChange={(e) =>
-                  setQuoteServicePrice({
-                    ...quoteServicePrice,
-                    [booking.id]: e.target.value
-                  })
-                }
-              />
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Service Price (R)"
+                    value={quoteServicePrice[booking.id] ?? ""}
+                    onChange={(e) =>
+                      setQuoteServicePrice({
+                        ...quoteServicePrice,
+                        [booking.id]: e.target.value
+                      })
+                    }
+                  />
 
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="Call-out Fee (R)"
-                value={quoteCalloutFee[booking.id] ?? ""}
-                onChange={(e) =>
-                  setQuoteCalloutFee({
-                    ...quoteCalloutFee,
-                    [booking.id]: e.target.value
-                  })
-                }
-              />
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Call-out Fee (R)"
+                    value={quoteCalloutFee[booking.id] ?? ""}
+                    onChange={(e) =>
+                      setQuoteCalloutFee({
+                        ...quoteCalloutFee,
+                        [booking.id]: e.target.value
+                      })
+                    }
+                  />
 
-              <input
-                type="text"
-                placeholder="Estimated Time (e.g. 2 hours)"
-                value={quoteEstimatedTime[booking.id] ?? ""}
-                onChange={(e) =>
-                  setQuoteEstimatedTime({
-                    ...quoteEstimatedTime,
-                    [booking.id]: e.target.value
-                  })
-                }
-              />
+                  <input
+                    type="text"
+                    placeholder="Estimated Time (e.g. 2–3 hours)"
+                    value={quoteEstimatedTime[booking.id] ?? ""}
+                    onChange={(e) =>
+                      setQuoteEstimatedTime({
+                        ...quoteEstimatedTime,
+                        [booking.id]: e.target.value
+                      })
+                    }
+                  />
 
-              <input
-                type="text"
-                placeholder="Warranty (e.g. 6 months on fitted parts)"
-                value={quoteWarranty[booking.id] ?? ""}
-                onChange={(e) =>
-                  setQuoteWarranty({
-                    ...quoteWarranty,
-                    [booking.id]: e.target.value
-                  })
-                }
-              />
+                  <input
+                    type="text"
+                    placeholder="Warranty (e.g. 12 months on qualifying parts)"
+                    value={quoteWarranty[booking.id] ?? ""}
+                    onChange={(e) =>
+                      setQuoteWarranty({
+                        ...quoteWarranty,
+                        [booking.id]: e.target.value
+                      })
+                    }
+                  />
 
-              <textarea
-                placeholder="Quote notes..."
-                value={quoteNotes[booking.id] ?? ""}
-                onChange={(e) =>
-                  setQuoteNotes({
-                    ...quoteNotes,
-                    [booking.id]: e.target.value
-                  })
-                }
-                rows={4}
-              />
+                  <textarea
+                    placeholder="Quote notes..."
+                    value={quoteNotes[booking.id] ?? ""}
+                    onChange={(e) =>
+                      setQuoteNotes({
+                        ...quoteNotes,
+                        [booking.id]: e.target.value
+                      })
+                    }
+                    rows={4}
+                  />
 
-              <button
-                type="button"
-                className="button-primary"
-                onClick={() =>
-                  handleSendQuote(booking.id)
-                }
-              >
-                Send Quote
-              </button>
-              </div>
-              )}
+                  <button
+                    type="button"
+                    className="button-primary"
+                    onClick={() => handleSendQuote(booking.id)}
+                  >
+                    Send Quote
+                  </button>
+                </div>
+              ) : null}
 
-                {booking.status === "pending" ? (
-                  <div className="inline-actions">
-                    <button
-                      className="button-primary"
-                      type="button"
-                      onClick={() => {
-                        startTransition(async () => {
-                          await handleBookingNotes(booking.id);
-
-                          await handleBookingStatus(
-                            booking.id,
-                            "confirmed"
-                          );
-                        });
-                      }}
-                    >
-                      Accept booking
-                    </button>
-                    <button
-                      className="button-secondary"
-                      type="button"
-                      onClick={() => {
-                        startTransition(async () => {
-                          await handleBookingNotes(booking.id);
-
-                          await handleBookingStatus(
-                            booking.id,
-                            "rejected"
-                          );
-                        });
-                      }}
-                    >
-                      Reject booking
-                    </button>
-                  </div>
-                ) : null}
-                {booking.status === "in_progress" ? (
-                <form action={markJobComplete}>
+               {booking.status === "pending" ? (
+              <div className="inline-actions">
+                <form action={updateBookingStatusAction}>
                   <input
                     type="hidden"
                     name="bookingId"
                     value={booking.id}
                   />
-
+                  <input
+                    type="hidden"
+                    name="status"
+                    value="confirmed"
+                  />
                   <button
-                    type="submit"
                     className="button-primary"
+                    type="submit"
                   >
-                    Mark Job Complete
+                    Accept booking
                   </button>
                 </form>
-              ) : null}
+
+                <form action={updateBookingStatusAction}>
+                  <input
+                    type="hidden"
+                    name="bookingId"
+                    value={booking.id}
+                  />
+                  <input
+                    type="hidden"
+                    name="status"
+                    value="rejected"
+                  />
+                  <button
+                    className="button-secondary"
+                    type="submit"
+                  >
+                    Reject booking
+                  </button>
+                </form>
+              </div>
+            ) : null}
                             </article>
                           ))
                         ) : (
