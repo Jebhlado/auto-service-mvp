@@ -18,6 +18,107 @@ type CustomerPageProps = {
   }>;
 };
 
+function getBookingLifecycle(
+  status: string,
+  quoteStatus?: string | null
+) {
+  if (quoteStatus === "quote_sent") {
+    return {
+      label: "Quote Received",
+      message:
+        "The provider has reviewed your request and sent you a quote.",
+      next:
+        "Review the quote below and approve it if you want the provider to proceed."
+    };
+  }
+
+  if (quoteStatus === "quote_rejected") {
+    return {
+      label: "Quote Declined",
+      message:
+        "You declined the provider's quote.",
+      next:
+        "This booking will not proceed unless a new booking is created."
+    };
+  }
+
+  if (status === "pending") {
+    return {
+      label: "Waiting for Provider",
+      message:
+        "Your booking request has been sent to the provider.",
+      next:
+        "The provider needs to review your request and send a quote."
+    };
+  }
+
+  if (status === "confirmed") {
+    return {
+      label: "Booking Confirmed",
+      message:
+        "Your booking has been accepted.",
+      next:
+        "The provider will proceed with the scheduled service."
+    };
+  }
+
+  if (status === "in_progress") {
+    return {
+      label: "Service In Progress",
+      message:
+        "The provider has accepted your quote and is working on your vehicle.",
+      next:
+        "Wait for the provider to complete the job."
+    };
+  }
+
+  if (status === "completed") {
+    return {
+      label: "Job Completed",
+      message:
+        "The provider has marked the job as complete.",
+      next:
+        "Confirm that the work has been completed."
+    };
+  }
+
+  if (status === "closed") {
+    return {
+      label: "Booking Closed",
+      message:
+        "You confirmed that the job was completed.",
+      next:
+        "Your booking is finished. You can review your experience below."
+    };
+  }
+
+  if (status === "rejected") {
+    return {
+      label: "Booking Rejected",
+      message:
+        "This booking was rejected by the provider.",
+      next:
+        "You can choose another provider and create a new booking."
+    };
+  }
+
+  if (status === "cancelled") {
+    return {
+      label: "Booking Cancelled",
+      message:
+        "This booking has been cancelled.",
+      next:
+        "You can create a new booking if you still need the service."
+    };
+  }
+
+  return {
+    label: status.replace("_", " "),
+    message: "Your booking status has been updated.",
+    next: "Check your booking for the latest information."
+  };
+}
+
 export default async function CustomerPage({ searchParams }: CustomerPageProps) {
   const params = await searchParams;
   const location = params.location?.trim() ?? "";
@@ -179,21 +280,47 @@ customerBookings = bookingsWithAttachments;
           </strong>
 
           <span
-            className={`status-chip ${
-              booking.status === "confirmed"
-                ? "status-confirmed"
-                : booking.status === "rejected"
-                ? "status-rejected"
-                : "status-pending"
-            }`}
-          >
-            {booking.status}
-          </span>
-        </div>
-
-        <span>
-          Date: {booking.appointment_date}
+          className={`status-chip ${
+            booking.status === "confirmed" ||
+            booking.status === "in_progress" ||
+            booking.status === "closed"
+              ? "status-confirmed"
+              : booking.status === "rejected" ||
+                booking.status === "cancelled"
+              ? "status-rejected"
+              : "status-pending"
+          }`}
+        >
+          {booking.quote_status === "quote_sent"
+            ? "QUOTE RECEIVED"
+            : booking.status.replace("_", " ").toUpperCase()}
         </span>
+        </div>
+        
+
+      {(() => {
+        const lifecycle = getBookingLifecycle(
+          booking.status,
+          booking.quote_status
+        );
+
+        return (
+          <div className="card">
+            <strong>{lifecycle.label}</strong>
+
+            <p>{lifecycle.message}</p>
+
+            <p className="muted">
+              <strong>What happens next:</strong>{" "}
+              {lifecycle.next}
+            </p>
+          </div>
+        );
+      })()}
+
+      <span>
+        Date: {booking.appointment_date}
+      </span>
 
         <span>
           Location:{" "}
@@ -306,12 +433,6 @@ customerBookings = bookingsWithAttachments;
     Reject Quote
   </button>
 </form>
-  </div>
-) : null}
-
-        {booking.quote_status === "quote_sent" ? (
-  <div className="card">
-    ...
   </div>
 ) : null}
 
