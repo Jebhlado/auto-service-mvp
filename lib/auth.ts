@@ -4,15 +4,11 @@ import type { ProfileRecord, UserRole } from "@/lib/types";
 
 export async function getSessionUser() {
   const supabase = await createClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
 
-  const result = await supabase.auth.getUser();
-
-  console.log("========== SERVER SESSION ==========");
-  console.log("USER:", result.data.user);
-  console.log("ERROR:", result.error);
-  console.log("====================================");
-
-  return result.data.user;
+  return user;
 }
 
 export async function getCurrentProfile() {

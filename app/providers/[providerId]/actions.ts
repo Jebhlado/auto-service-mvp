@@ -67,11 +67,7 @@ export async function createBookingAction(formData: FormData) {
       throw new Error("Attachment upload failed.");
     }
 
-    const { data } = supabase.storage
-      .from("booking-attachments")
-      .getPublicUrl(fileName);
-
-    attachmentUrl = data.publicUrl;
+    attachmentUrl = fileName;
   }
 
   const { error } = await supabase.from("bookings").insert({

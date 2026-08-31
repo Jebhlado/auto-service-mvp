@@ -15,7 +15,7 @@ import type { BookingRecord, ProfileRecord, ProviderProfileRecord } from "@/lib/
 type ProviderDashboardState = {
   profile: ProfileRecord | null;
   providerProfile: ProviderProfileRecord | null;
-  bookings: BookingRecord[];
+  bookings: ProviderDashboardBooking[];
 
   totalBookings: number;
   pendingBookings: number;
@@ -33,6 +33,16 @@ type ProviderDashboardState = {
   message: string;
   is_read: boolean;
 }[];
+};
+
+type ProviderDashboardBooking = BookingRecord & {
+  attachmentUrl: string | null;
+  customer: {
+    id: string;
+    full_name: string;
+    phone: string | null;
+    email: string;
+  } | null;
 };
 
 export function ProviderDashboardClient() {
@@ -171,22 +181,52 @@ export function ProviderDashboardClient() {
 }
 
   const customerIds =
-    bookings?.map((booking) => booking.customer_id) ?? [];
+  bookings?.map((booking) => booking.customer_id) ?? [];
 
-  const { data: customers } = await supabase
+const { data: customers } = await supabase
   .from("profiles")
   .select("id, full_name, phone, email")
   .in("id", customerIds);
-  console.log("CUSTOMERS:", customers);
 
-  const enrichedBookings =
-    bookings?.map((booking) => ({
+const enrichedBookings = await Promise.all(
+  (bookings ?? []).map(async (booking) => {
+    let attachmentUrl: string | null = null;
+
+    if (booking.attachment_url) {
+      let storagePath = booking.attachment_url.trim();
+
+      const publicMarker =
+        "/storage/v1/object/public/booking-attachments/";
+
+      const markerIndex = storagePath.indexOf(publicMarker);
+
+      if (markerIndex !== -1) {
+        storagePath = decodeURIComponent(
+          storagePath.slice(
+            markerIndex + publicMarker.length
+          )
+        );
+      }
+
+      const { data: signedAttachment } =
+        await supabase.storage
+          .from("booking-attachments")
+          .createSignedUrl(storagePath, 60 * 10);
+
+      attachmentUrl =
+        signedAttachment?.signedUrl ?? null;
+    }
+
+    return {
       ...booking,
+      attachmentUrl,
       customer:
         customers?.find(
           (customer) => customer.id === booking.customer_id
         ) ?? null
-    })) ?? [];
+    };
+  })
+);
 
 
     const totalBookings = enrichedBookings.length;
@@ -246,7 +286,7 @@ const averageRating =
   setState({
   profile,
   providerProfile: providerProfile ?? null,
-  bookings: enrichedBookings as BookingRecord[],
+  bookings: enrichedBookings,
 
   notifications: notifications ?? [],
 
@@ -675,7 +715,7 @@ const averageRating =
                     <br />
 
                     <a
-                      href={booking.attachment_url}
+                      href={booking.attachmentUrl ?? undefined}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="button-secondary"
@@ -919,6 +959,23 @@ const averageRating =
                 </form>
               </div>
             ) : null}
+
+            {booking.status === "in_progress" ? (
+            <form action={markJobComplete}>
+              <input
+                type="hidden"
+                name="bookingId"
+                value={booking.id}
+              />
+
+              <button
+                type="submit"
+                className="button-primary"
+              >
+                Mark Job Complete
+              </button>
+            </form>
+          ) : null}
                             </article>
                           ))
                         ) : (

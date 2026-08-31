@@ -67,11 +67,7 @@ export async function createBookingAction(formData: FormData) {
       throw new Error("Attachment upload failed.");
     }
 
-    const { data } = supabase.storage
-      .from("booking-attachments")
-      .getPublicUrl(fileName);
-
-    attachmentUrl = data.publicUrl;
+    attachmentUrl = fileName;
   }
 
   const { error } = await supabase.from("bookings").insert({
@@ -180,14 +176,10 @@ export async function updateBookingStatusAction(
   revalidatePath("/customer");
 }
 
-export async function sendQuoteAction(
-  formData: FormData
-) {
+export async function sendQuoteAction(formData: FormData) {
   const { user } = await requireRole(["provider"]);
 
-  const bookingId = String(
-    formData.get("bookingId") ?? ""
-  );
+  const bookingId = String(formData.get("bookingId") ?? "");
 
   const servicePrice = Number(
     formData.get("servicePrice") ?? 0
@@ -210,15 +202,24 @@ export async function sendQuoteAction(
   );
 
   if (!bookingId) {
-    throw new Error("Booking ID is required.");
+    return {
+      success: false,
+      message: "Booking ID is required."
+    };
   }
 
   if (!Number.isFinite(servicePrice) || servicePrice <= 0) {
-    throw new Error("Service Price must be greater than R0.");
+    return {
+      success: false,
+      message: "Service Price must be greater than R0."
+    };
   }
 
   if (!Number.isFinite(calloutFee) || calloutFee < 0) {
-    throw new Error("Call-out Fee cannot be negative.");
+    return {
+      success: false,
+      message: "Call-out Fee cannot be negative."
+    };
   }
 
   const total = servicePrice + calloutFee;
@@ -234,21 +235,26 @@ export async function sendQuoteAction(
       .single();
 
   if (bookingError || !booking) {
-    throw new Error(
-      "Booking not found or access denied."
-    );
+    return {
+      success: false,
+      message: "Booking not found or access denied."
+    };
   }
 
   if (booking.status !== "confirmed") {
-    throw new Error(
-      "A quote can only be sent for a confirmed booking."
-    );
+    return {
+      success: false,
+      message:
+        "A quote can only be sent for a confirmed booking."
+    };
   }
 
   if (booking.quote_status === "quote_sent") {
-    throw new Error(
-      "A quote has already been sent for this booking."
-    );
+    return {
+      success: false,
+      message:
+        "A quote has already been sent for this booking."
+    };
   }
 
   const { data: updatedBooking, error } =
@@ -272,15 +278,22 @@ export async function sendQuoteAction(
       .maybeSingle();
 
   if (error || !updatedBooking) {
-    throw new Error(
-      error?.message ??
+    return {
+      success: false,
+      message:
+        error?.message ??
         "Quote could not be sent from the current booking state."
-    );
+    };
   }
 
   revalidatePath("/provider");
   revalidatePath("/dashboard/provider");
   revalidatePath("/customer");
+
+  return {
+    success: true,
+    message: "Quote sent successfully."
+  };
 }
 
 export async function markJobComplete(

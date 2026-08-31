@@ -1,17 +1,22 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function createNotification(
   userId: string,
   title: string,
   message: string
 ) {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
-  await supabase
+  const { error } = await supabase
     .from("notifications")
     .insert({
       user_id: userId,
       title,
       message
     });
+
+  if (error) {
+    console.error("Notification creation failed:", error);
+    throw new Error(error.message);
+  }
 }
