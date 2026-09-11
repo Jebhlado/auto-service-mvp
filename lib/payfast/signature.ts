@@ -8,7 +8,6 @@ export function generatePayfastSignature(
 ): string {
   const fields = Object.entries(data)
     .filter(([, value]) => value !== "")
-    .sort(([a], [b]) => a.localeCompare(b))
     .map(
       ([key, value]) =>
         `${key}=${encodeURIComponent(value).replace(/%20/g, "+")}`
