@@ -23,6 +23,17 @@ create table if not exists public.provider_profiles (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.provider_payment_accounts (
+  provider_id uuid primary key
+    references public.provider_profiles(user_id)
+    on delete cascade,
+  payfast_merchant_id text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint provider_payment_accounts_payfast_merchant_id_unique
+    unique (payfast_merchant_id)
+);
+
 create table if not exists public.bookings (
   id uuid primary key default gen_random_uuid(),
   customer_id uuid not null references public.profiles(id) on delete cascade,
@@ -49,7 +60,14 @@ before update on public.provider_profiles
 for each row
 execute function public.set_updated_at();
 
+drop trigger if exists provider_payment_accounts_set_updated_at on public.provider_payment_accounts;
+create trigger provider_payment_accounts_set_updated_at
+before update on public.provider_payment_accounts
+for each row
+execute function public.set_updated_at();
+
 alter table public.profiles enable row level security;
+alter table public.provider_payment_accounts enable row level security;
 alter table public.provider_profiles enable row level security;
 alter table public.bookings enable row level security;
 
@@ -112,6 +130,28 @@ for update
 to authenticated
 using (auth.uid() = user_id or public.is_admin())
 with check (auth.uid() = user_id or public.is_admin());
+
+drop policy if exists "provider_payment_accounts_select_own" on public.provider_payment_accounts;
+create policy "provider_payment_accounts_select_own"
+on public.provider_payment_accounts
+for select
+to authenticated
+using (auth.uid() = provider_id or public.is_admin());
+
+drop policy if exists "provider_payment_accounts_insert_own" on public.provider_payment_accounts;
+create policy "provider_payment_accounts_insert_own"
+on public.provider_payment_accounts
+for insert
+to authenticated
+with check (auth.uid() = provider_id or public.is_admin());
+
+drop policy if exists "provider_payment_accounts_update_own" on public.provider_payment_accounts;
+create policy "provider_payment_accounts_update_own"
+on public.provider_payment_accounts
+for update
+to authenticated
+using (auth.uid() = provider_id or public.is_admin())
+with check (auth.uid() = provider_id or public.is_admin());
 
 drop policy if exists "bookings_insert_customer" on public.bookings;
 create policy "bookings_insert_customer"

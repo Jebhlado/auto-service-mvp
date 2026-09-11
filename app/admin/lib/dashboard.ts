@@ -32,10 +32,12 @@ export function buildDashboardStats({
 }: DashboardStatsInput): DashboardStats {
   const safeBookings = bookings ?? [];
 
-  const platformRevenue = safeBookings.reduce(
-  (sum, booking) => sum + (booking.quote_total ?? 0),
-  0
-);
+ const platformRevenue = safeBookings
+  .filter((booking) => booking.status === "closed")
+  .reduce(
+    (sum, booking) => sum + (booking.quote_total ?? 0),
+    0
+  );
 
   return {
     totalCustomers,
@@ -51,7 +53,7 @@ export function buildDashboardStats({
 ).length,
 
 completedJobs: safeBookings.filter(
-  (booking) => booking.status === "completed"
+  (booking) => booking.status === "closed"
 ).length,
 
 pendingBookings: safeBookings.filter(

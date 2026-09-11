@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 
 export default function CompleteProviderProfile() {
   const router = useRouter()
@@ -13,8 +13,11 @@ export default function CompleteProviderProfile() {
   const [experience, setExperience] = useState('')
   const [bio, setBio] = useState('')
   const [mobileService, setMobileService] = useState('yes')
+  const [payfastMerchantId, setPayfastMerchantId] = useState('')
 
   async function handleSubmit() {
+    const supabase = createClient()
+
     const {
       data: { user }
     } = await supabase.auth.getUser()
@@ -34,10 +37,18 @@ export default function CompleteProviderProfile() {
       })
       .eq('user_id', user.id)
 
-   if (!error) {
-  router.push('/provider/submitted')
+    if (error) return
 
-  }
+    const { error: paymentAccountError } = await supabase
+      .from('provider_payment_accounts')
+      .upsert({
+        provider_id: user.id,
+        payfast_merchant_id: payfastMerchantId.trim()
+      })
+
+    if (paymentAccountError) return
+
+    router.push('/provider/submitted')
 }
 
   return (
@@ -87,6 +98,18 @@ export default function CompleteProviderProfile() {
         <option value="yes">Yes</option>
         <option value="no">No</option>
       </select>
+
+      <br /><br />
+
+      <label>
+        Payfast Merchant ID
+      </label>
+
+      <input
+        placeholder="Enter your Payfast Merchant ID"
+        value={payfastMerchantId}
+        onChange={(e) => setPayfastMerchantId(e.target.value)}
+      />
 
       <br /><br />
 

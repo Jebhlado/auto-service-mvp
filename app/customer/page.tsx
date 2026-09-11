@@ -141,6 +141,14 @@ if (user) {
         business_name,
         location,
         contact_phone
+      ),
+      payment:payments(
+        id,
+        amount,
+        currency,
+        status,
+        refunded_amount,
+        payfast_reference
       )
     `)
     .eq("customer_id", user.id)
@@ -433,6 +441,38 @@ customerBookings = bookingsWithAttachments;
     Reject Quote
   </button>
 </form>
+  </div>
+) : null}
+
+{booking.quote_status === "quote_approved" && booking.payment?.status === "pending" ? (
+  <div className="card">
+    <strong>Payment Required</strong>
+
+    <p>
+      Your quote has been approved. Payment is required before the provider can begin the job.
+    </p>
+
+    <p>
+      <strong>Amount Due:</strong>{" "}
+      {booking.payment.currency} {Number(booking.payment.amount).toFixed(2)}
+    </p>
+
+    <p>
+      <strong>Payment Status:</strong>{" "}
+      Awaiting Payment
+    </p>
+
+    <button
+      type="button"
+      className="button-primary"
+      disabled
+    >
+      Pay Now
+    </button>
+
+    <p className="muted">
+      Online payment will be available shortly.
+    </p>
   </div>
 ) : null}
 

@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
+import { approveQuoteAndCreatePayment } from "@/lib/payments";
 
 export async function updateQuoteStatus(
   formData: FormData
@@ -33,7 +34,9 @@ export async function updateQuoteStatus(
   const { data: booking, error: bookingError } =
     await supabase
       .from("bookings")
-      .select("id, customer_id, quote_status")
+      .select(
+        "id, customer_id, provider_id, status, quote_status, quote_total"
+      )
       .eq("id", bookingId)
       .eq("customer_id", user.id)
       .single();
@@ -50,28 +53,42 @@ export async function updateQuoteStatus(
     );
   }
 
-  const updateData =
-    decision === "approve"
-      ? {
-          quote_status: "quote_approved",
-          quote_approved_at:
-            new Date().toISOString(),
-          status: "in_progress"
-        }
-      : {
-          quote_status: "quote_rejected"
-        };
+  if (decision === "reject") {
+    const { error } = await supabase
+      .from("bookings")
+      .update({
+        quote_status: "quote_rejected"
+      })
+      .eq("id", bookingId)
+      .eq("customer_id", user.id)
+      .eq("quote_status", "quote_sent");
 
-  const { error } = await supabase
-    .from("bookings")
-    .update(updateData)
-    .eq("id", bookingId)
-    .eq("customer_id", user.id)
-    .eq("quote_status", "quote_sent");
+    if (error) {
+      throw new Error(error.message);
+    }
 
-  if (error) {
-    throw new Error(error.message);
+    revalidatePath("/customer");
+    revalidatePath("/provider");
+
+    return;
   }
+
+  if (booking.status !== "confirmed") {
+    throw new Error(
+      "Only confirmed bookings can have their quote approved."
+    );
+  }
+
+  if (
+    !Number.isFinite(Number(booking.quote_total)) ||
+    Number(booking.quote_total) <= 0
+  ) {
+    throw new Error(
+      "This quote does not have a valid payment amount."
+    );
+  }
+
+  await approveQuoteAndCreatePayment(bookingId);
 
   revalidatePath("/customer");
   revalidatePath("/provider");

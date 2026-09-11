@@ -51,25 +51,36 @@ const { data: allCustomers } = await supabase
     ascending: false,
   });
     
+    const bookingSelect =
+    "id, customer_id, provider_id, appointment_date, issue_description, status, created_at, quote_total, attachment_url, customer:profiles(full_name, phone), provider:provider_profiles!bookings_provider_id_fkey(business_name, location)";
+
+  const { data: allBookings } =
+    await supabase
+      .from("bookings")
+      .select(bookingSelect)
+      .returns<BookingRecord[]>()
+      .order("created_at", {
+        ascending: false
+      });
+
   let bookingsQuery = supabase
-  .from("bookings")
-  .select(
-    "id, customer_id, provider_id, appointment_date, issue_description, status, created_at, quote_total, attachment_url, customer:profiles(full_name, phone), provider:provider_profiles!bookings_provider_id_fkey(business_name, location)"
-  );
+    .from("bookings")
+    .select(bookingSelect);
 
-if (bookingStatus !== "all") {
-  bookingsQuery = bookingsQuery.eq(
-    "status",
-    bookingStatus
-  );
-}
+  if (bookingStatus !== "all") {
+    bookingsQuery = bookingsQuery.eq(
+      "status",
+      bookingStatus
+    );
+  }
 
-const { data: bookings } =
-  await bookingsQuery
-    .returns<BookingRecord[]>()
-    .order("created_at", {
-      ascending: false
-    });
+  const { data: bookings } =
+    await bookingsQuery
+      .returns<BookingRecord[]>()
+      .order("created_at", {
+        ascending: false
+      });
+
       const bookingsWithAttachments = await Promise.all(
     (bookings ?? []).map(async (booking) => ({
       ...booking,
@@ -98,7 +109,7 @@ const { count: totalProviders } =
     .eq("role", "provider");
 
   const stats = buildDashboardStats({
-  bookings,
+  bookings: allBookings,
   pendingProviders: pendingProviders.length,
   totalCustomers: totalCustomers ?? 0,
   totalProviders: totalProviders ?? 0,
@@ -165,69 +176,57 @@ const { count: totalProviders } =
 
   <KpiGrid>
   <StatTile
-  title="Total Customers"
-  value={totalCustomers ?? 0}
-  href="/admin/customers"
-/>
+    title="Total Customers"
+    value={totalCustomers ?? 0}
+    href="/admin/customers"
+  />
 
   <StatTile
-  title="Total Providers"
-  value={totalProviders ?? 0}
-  href="/admin/providers"
-/>
+    title="Total Providers"
+    value={totalProviders ?? 0}
+    href="/admin/providers"
+  />
 
   <StatTile
-  title="Pending Approvals"
-  value={stats.pendingApprovals}
-  href="/admin/providers?status=pending"
-/>
+    title="Pending Approvals"
+    value={stats.pendingApprovals}
+    href="/admin/providers?status=pending"
+  />
 
   <StatTile
-  title="Pending Bookings"
-  value={stats.pendingBookings}
-  href="/admin/bookings?status=pending"
-/>
+    title="Pending Bookings"
+    value={stats.pendingBookings}
+    href="/admin/bookings?status=pending"
+  />
 
   <StatTile
-  title="Completed Jobs"
-  value={stats.completedJobs}
-  href="/admin/bookings?status=completed"
-/>
+    title="Confirmed Bookings"
+    value={stats.confirmedBookings}
+    href="/admin/bookings?status=confirmed"
+  />
 
   <StatTile
-  title="Platform Revenue"
-  value={`R${stats.platformRevenue}`}
-/>
-  
+    title="In Progress"
+    value={stats.inProgressBookings}
+    href="/admin/bookings?status=in_progress"
+  />
+
   <StatTile
-  title="Pending Bookings"
-  value={stats.pendingBookings}
-  href="/admin/bookings?status=pending"
-/>
+    title="Completed Jobs"
+    value={stats.completedJobs}
+    href="/admin/bookings?status=closed"
+  />
 
-<StatTile
-  title="Confirmed Bookings"
-  value={stats.confirmedBookings}
-  href="/admin/bookings?status=confirmed"
-/>
+  <StatTile
+    title="Rejected Bookings"
+    value={stats.rejectedBookings}
+    href="/admin/bookings?status=rejected"
+  />
 
-<StatTile
-  title="In Progress"
-  value={stats.inProgressBookings}
-  href="/admin/bookings?status=in_progress"
-/>
-
-<StatTile
-  title="Rejected Bookings"
-  value={stats.rejectedBookings}
-  href="/admin/bookings?status=rejected"
-/>
-
-<StatTile
-  title="Closed Jobs"
-  value={stats.closedBookings}
-  href="/admin/bookings?status=closed"
-/>
+  <StatTile
+    title="Platform Revenue"
+    value={`R${stats.platformRevenue}`}
+  />
 
 </KpiGrid>
 </PageSection>
@@ -331,10 +330,10 @@ const { count: totalProviders } =
   {allProviders?.length ? (
     allProviders.map((provider) => {
   const providerBookings =
-    bookings?.filter(
-      (booking) =>
-        booking.provider_id === provider.user_id
-    ) ?? [];
+  allBookings?.filter(
+    (booking) =>
+      booking.provider_id === provider.user_id
+  ) ?? [];
 
   const totalBookings =
     providerBookings.length;
@@ -346,7 +345,12 @@ const { count: totalProviders } =
     ).length;
 
   const revenue =
-    providerBookings.reduce(
+  providerBookings
+    .filter(
+      (booking) =>
+        booking.status === "closed"
+    )
+    .reduce(
       (sum, booking) =>
         sum + (booking.quote_total ?? 0),
       0
@@ -469,10 +473,10 @@ const { count: totalProviders } =
   {allCustomers?.length ? (
     allCustomers.map((customer) => {
       const customerBookings =
-        bookings?.filter(
-          (booking) =>
-            booking.customer_id === customer.id
-        ) ?? [];
+      allBookings?.filter(
+    (booking) =>
+      booking.customer_id === customer.id
+     ) ?? [];
 
       const totalBookings =
         customerBookings.length;
