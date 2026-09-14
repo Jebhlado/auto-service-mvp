@@ -4,10 +4,14 @@ import crypto from "node:crypto";
 
 export function generatePayfastSignature(
   data: Record<string, string>,
-  passphrase?: string
+  passphrase?: string,
+  excludedFields: readonly string[] = []
 ): string {
   const fields = Object.entries(data)
-    .filter(([, value]) => value !== "")
+    .filter(
+      ([key, value]) =>
+        value !== "" && !excludedFields.includes(key)
+    )
     .map(
       ([key, value]) =>
         `${key}=${encodeURIComponent(value).replace(/%20/g, "+")}`
