@@ -1,23 +1,25 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
   const [message, setMessage] = useState('')
 
   async function updatePassword() {
-    const { error } = await supabase.auth.updateUser({
-      password
-    })
+  const supabase = createClient()
 
-    if (error) {
-      setMessage(error.message)
-    } else {
-      setMessage('Password updated successfully')
-    }
+  const { error } = await supabase.auth.updateUser({
+    password
+  })
+
+  if (error) {
+    setMessage(error.message)
+  } else {
+    setMessage('Password updated successfully')
   }
+}
 
   return (
     <div style={{ padding: 20 }}>
