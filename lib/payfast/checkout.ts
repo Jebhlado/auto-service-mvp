@@ -75,22 +75,23 @@ export async function createPayfastCheckout(
   }
 
   const {
-    data: providerPaymentAccount,
-    error: providerPaymentError
-  } = await supabase
-    .from("provider_payment_accounts")
-    .select("payfast_merchant_id")
-    .eq("provider_id", payment.provider_id)
-    .single();
-
-  if (
-    providerPaymentError ||
-    !providerPaymentAccount
-  ) {
-    throw new Error(
-      "This provider does not have a PayFast payment account configured."
-    );
+  data: payfastMerchantId,
+  error: providerPaymentError
+} = await supabase.rpc(
+  "get_payfast_merchant_id_for_payment",
+  {
+    p_payment_id: payment.id
   }
+);
+
+if (
+  providerPaymentError ||
+  !payfastMerchantId
+) {
+  throw new Error(
+    "This provider does not have a PayFast payment account configured."
+  );
+}
 
   const amount = Number(payment.amount);
 
@@ -137,8 +138,7 @@ export async function createPayfastCheckout(
 
   const setup = JSON.stringify({
   split_payment: {
-    merchant_id:
-      providerPaymentAccount.payfast_merchant_id,
+    merchant_id: payfastMerchantId,
     percentage: 85
   }
 });

@@ -4,11 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import {
-  markJobComplete,
-  sendQuoteAction,
-  updateBookingStatusAction
-} from "@/app/provider/actions";
+import { markJobComplete, savePayfastAccountAction, sendQuoteAction, updateBookingStatusAction } from "@/app/provider/actions";
 import { GAUTENG_LOCATIONS, PROVIDER_SPECIALISTS } from "@/lib/provider-options";
 import type { BookingRecord, ProfileRecord, ProviderProfileRecord } from "@/lib/types";
 
@@ -69,6 +65,7 @@ export function ProviderDashboardClient() {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [payfastMerchantId, setPayfastMerchantId] = useState("");
 
   const [savedNotes, setSavedNotes] =
   useState<Record<string, boolean>>({});
@@ -159,6 +156,16 @@ export function ProviderDashboardClient() {
     .select("*")
     .eq("user_id", user.id)
     .single<ProviderProfileRecord>();
+
+  const { data: paymentAccount } = await supabase
+  .from("provider_payment_accounts")
+  .select("payfast_merchant_id")
+  .eq("provider_id", user.id)
+  .maybeSingle();
+
+setPayfastMerchantId(
+  paymentAccount?.payfast_merchant_id ?? ""
+);
 
   const { data: bookings } = await supabase
     .from("bookings")
@@ -625,15 +632,80 @@ const averageRating =
             defaultValue={state.providerProfile?.bio ?? ""}
             placeholder="Short description of your workshop, turnaround time, or speciality"
           />
-          <button className="button-primary" type="submit" disabled={isPending}>
-            {isPending ? "Saving profile..." : "Save profile for admin review"}
-          </button>
-</form>
+              <button className="button-primary" type="submit" disabled={isPending}>
+      {isPending ? "Saving profile..." : "Save profile for admin review"}
+    </button>
+  </form>
 
-<div className="card stack-md">
-  <div className="eyebrow">
-    Notifications
+  {/* PAYMENT SETTINGS START */}
+  <div className="card stack-md">
+    <div className="eyebrow">
+      Payment Settings
+    </div>
+
+    <div>
+      <strong>PayFast Merchant ID</strong>
+      <p className="muted">
+        Add your PayFast merchant ID so customers can pay for
+        approved quotes through AutoCare Connect.
+      </p>
+    </div>
+
+    <form
+      action={(formData) => {
+        startTransition(async () => {
+          try {
+            const result = await savePayfastAccountAction(formData);
+
+            if (result.success) {
+              setError(null);
+              setFeedback(result.message);
+              await loadDashboard();
+            }
+          } catch (error) {
+            setError(
+              error instanceof Error
+                ? error.message
+                : "Unable to save PayFast account."
+            );
+          }
+        });
+      }}
+      className="stack-sm"
+    >
+      <input
+        name="payfastMerchantId"
+        value={payfastMerchantId}
+        onChange={(event) =>
+          setPayfastMerchantId(event.target.value)
+        }
+        placeholder="Enter your PayFast Merchant ID"
+        required
+      />
+
+      <button
+        className="button-primary"
+        type="submit"
+        disabled={isPending}
+      >
+        {isPending
+          ? "Saving PayFast account..."
+          : "Save PayFast account"}
+      </button>
+    </form>
+
+    <p className="muted">
+      {payfastMerchantId
+        ? "PayFast account configured."
+        : "PayFast account not configured yet."}
+    </p>
   </div>
+  {/* PAYMENT SETTINGS END */}
+
+  <div className="card stack-md">
+    <div className="eyebrow">
+      Notifications
+    </div>
 
   {state.notifications.length ? (
     state.notifications.map((notification) => (

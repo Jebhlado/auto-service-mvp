@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { approveQuoteAndCreatePayment } from "@/lib/payments";
+import { createPayfastCheckout } from "@/lib/payfast/checkout";
 
 export async function updateQuoteStatus(
   formData: FormData
@@ -92,6 +93,22 @@ export async function updateQuoteStatus(
 
   revalidatePath("/customer");
   revalidatePath("/provider");
+}
+
+export async function startPayfastCheckout(
+  formData: FormData
+) {
+  await requireRole(["customer"]);
+
+  const paymentId = String(
+    formData.get("paymentId") ?? ""
+  );
+
+  if (!paymentId) {
+    throw new Error("Payment ID is required.");
+  }
+
+  return createPayfastCheckout(paymentId);
 }
 
 export async function confirmCompletedJob(

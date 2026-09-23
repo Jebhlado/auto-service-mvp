@@ -1,7 +1,8 @@
 import {
   updateQuoteStatus,
   confirmCompletedJob,
-  createReview
+  createReview,
+  startPayfastCheckout
 } from "./actions";
 
 import Link from "next/link";
@@ -9,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatServices } from "@/lib/utils";
 import { getBookingAttachmentUrl } from "@/lib/attachments";
 import type { ProviderProfileRecord } from "@/lib/types";
+import { PayFastCheckoutButton } from "@/components/customer/PayFastCheckoutButton";
 
 type CustomerPageProps = {
   searchParams: Promise<{
@@ -462,17 +464,10 @@ customerBookings = bookingsWithAttachments;
       Awaiting Payment
     </p>
 
-    <button
-      type="button"
-      className="button-primary"
-      disabled
-    >
-      Pay Now
-    </button>
+    <PayFastCheckoutButton
+  paymentId={booking.payment.id}
+/>
 
-    <p className="muted">
-      Online payment will be available shortly.
-    </p>
   </div>
 ) : null}
 

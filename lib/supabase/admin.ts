@@ -3,20 +3,29 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 
 export function createAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const secretKey = process.env.SUPABASE_SECRET_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
 
-  if (!url || !secretKey) {
+  if (!supabaseUrl) {
     throw new Error(
-      "Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SECRET_KEY."
+      "Missing required environment variable: NEXT_PUBLIC_SUPABASE_URL"
     );
   }
 
-  return createClient(url, secretKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false
+  if (!supabaseSecretKey) {
+    throw new Error(
+      "Missing required environment variable: SUPABASE_SECRET_KEY"
+    );
+  }
+
+  return createClient(
+    supabaseUrl,
+    supabaseSecretKey,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
     }
-  });
+  );
 }

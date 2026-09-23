@@ -328,3 +328,40 @@ export async function markJobComplete(
   revalidatePath("/provider");
   revalidatePath("/customer");
 }
+
+export async function savePayfastAccountAction(
+  formData: FormData
+) {
+  const { user } = await requireRole(["provider"]);
+
+  const payfastMerchantId = String(
+    formData.get("payfastMerchantId") ?? ""
+  ).trim();
+
+  if (!payfastMerchantId) {
+    throw new Error(
+      "PayFast Merchant ID is required."
+    );
+  }
+
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("provider_payment_accounts")
+    .upsert({
+      provider_id: user.id,
+      payfast_merchant_id: payfastMerchantId
+    });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/provider");
+  revalidatePath("/dashboard/provider");
+
+  return {
+    success: true,
+    message: "PayFast account saved successfully."
+  };
+}
