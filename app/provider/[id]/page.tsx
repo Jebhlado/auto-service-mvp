@@ -21,8 +21,6 @@ export default async function ProviderPage({
   }
 
   // ✅ NOW SAFE TO FETCH BOOKINGS
-  let bookings: any[] = [];
-
   const { data: bookingData } = await supabase
     .from("bookings")
     .select(`
@@ -40,7 +38,7 @@ export default async function ProviderPage({
     .eq("customer_id", user.id)
     .order("created_at", { ascending: false });
 
-  bookings = bookingData ?? [];
+  const bookings = bookingData ?? [];
 
   // 👉 you can now use bookings below in your UI
 
@@ -52,7 +50,7 @@ export default async function ProviderPage({
         {bookings.length ? (
           bookings.map((booking) => (
             <div key={booking.id} className="card">
-              <strong>{booking.provider?.business_name}</strong>
+              <strong>{booking.provider?.[0]?.business_name}</strong>
               <p>{booking.issue_description}</p>
               <span>{booking.appointment_date}</span>
             </div>

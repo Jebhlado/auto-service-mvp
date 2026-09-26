@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -14,7 +14,7 @@ function redirectForRole(role: string) {
 export function AuthForm() {
   const [mode, setMode] = useState<"login" | "signup">("signup");
   const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [isPending] = useTransition();
   const router = useRouter();
 
   async function handleSignup(formData: FormData) {

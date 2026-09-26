@@ -175,16 +175,16 @@ export async function getRecentActivity() {
     return [];
   }
 
-  return (data ?? []).map((booking: any) => ({
-    id: booking.id,
-    status: booking.status,
-    appointmentDate: booking.appointment_date,
-    createdAt: booking.created_at,
-    customer:
-      booking.customer?.full_name ?? "Unknown Customer",
-    provider:
-      booking.provider?.business_name ?? "Unknown Provider",
-  }));
+  return (data ?? []).map((booking) => ({
+  id: booking.id,
+  status: booking.status,
+  appointmentDate: booking.appointment_date,
+  createdAt: booking.created_at,
+  customer:
+    booking.customer?.[0]?.full_name ?? "Unknown Customer",
+  provider:
+    booking.provider?.[0]?.business_name ?? "Unknown Provider",
+}));
 }
 
 export async function getAnalyticsSummary() {
@@ -260,8 +260,8 @@ export async function getAnalyticsSummary() {
   }
 >();
 
-completedBookings?.forEach((booking: any) => {
-  const provider = booking.provider?.business_name ?? "Unknown";
+completedBookings?.forEach((booking) => {
+  const provider = booking.provider?.[0]?.business_name ?? "Unknown";
 
   if (!providerStats.has(provider)) {
     providerStats.set(provider, {
@@ -324,7 +324,7 @@ let revenueLastMonth = 0;
 let bookingsThisMonth = 0;
 let bookingsLastMonth = 0;
 
-completedBookings?.forEach((booking: any) => {
+completedBookings?.forEach((booking) => {
   const bookingDate = new Date(booking.appointment_date);
 
   const month = bookingDate.getMonth();

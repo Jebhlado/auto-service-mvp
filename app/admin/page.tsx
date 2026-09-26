@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getBookingAttachmentUrl } from "@/lib/attachments";
 import { updateProviderApprovalAction, toggleProviderStatusAction, cancelBookingAction, markBookingResolvedAction } from "@/app/admin/actions";
 import { getPendingProviders, getProviders } from "@/app/admin/lib/admin";
-import type { BookingRecord, ProfileRecord, ProviderProfileRecord } from "@/lib/types";
+import type { BookingRecord, ProfileRecord } from "@/lib/types";
 import PageSection from "@/components/ui/PageSection";
 import KpiGrid from "@/components/ui/layout/KpiGrid";
 import { buildDashboardStats } from "@/app/admin/lib/dashboard";

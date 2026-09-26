@@ -2,7 +2,6 @@ import {
   updateQuoteStatus,
   confirmCompletedJob,
   createReview,
-  startPayfastCheckout
 } from "./actions";
 
 import Link from "next/link";
