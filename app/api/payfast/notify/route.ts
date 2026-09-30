@@ -520,11 +520,9 @@ export async function POST(
     } = await supabase
       .from("payments")
       .update({
-        payfast_payment_id:
-          payfastPaymentId,
-        payfast_reference:
-          paymentId,
-        metadata: {
+      payfast_payment_id: payfastPaymentId,
+      payfast_reference: payfastPaymentId,
+      metadata: {
           payfast: {
             merchant_id:
               data.merchant_id,
