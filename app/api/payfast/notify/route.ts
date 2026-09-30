@@ -96,20 +96,25 @@ function getRequestIp(
   return realIp?.trim() || null;
 }
 
+
 function buildItNParameterString(
   data: Record<string, string>
 ): string {
-  return Object.entries(data)
-    .filter(
-      ([key, value]) =>
-        key !== "signature" &&
-        value !== ""
-    )
+  const entries = Object.entries(data);
+
+  const signatureIndex = entries.findIndex(
+    ([key]) => key === "signature"
+  );
+
+  const signedEntries =
+    signatureIndex >= 0
+      ? entries.slice(0, signatureIndex)
+      : entries;
+
+  return signedEntries
     .map(
       ([key, value]) =>
-        `${key}=${encodeURIComponent(
-          value.trim()
-        )
+        `${key}=${encodeURIComponent(value.trim())
           .replace(/%20/g, "+")
           .replace(/[!'()*~]/g, (character) =>
             `%${character
