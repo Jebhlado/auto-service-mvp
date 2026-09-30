@@ -476,18 +476,15 @@ export async function POST(
             error: transitionError
           } = await supabase.rpc(
             "transition_payment",
+            
             {
-              p_payment_id:
-                payment.id,
-              p_to_status:
-                "cancelled",
-              p_reason:
-                "PayFast payment cancelled",
-              p_metadata: {
-                payfast_payment_id:
-                  payfastPaymentId,
-                payment_status:
-                  paymentStatus
+              p_payment_id: payment.id,
+              p_new_status: "cancelled",
+              p_payfast_reference: payfastPaymentId,
+              p_payload: {
+                reason: "PayFast payment cancelled",
+                payfast_payment_id: payfastPaymentId,
+                payment_status: paymentStatus
               }
             }
           );
@@ -569,23 +566,21 @@ export async function POST(
     if (
       payment.status === "pending"
     ) {
-      const {
-        error: processingError
-      } = await supabase.rpc(
-        "transition_payment",
-        {
-          p_payment_id:
-            payment.id,
-          p_to_status:
-            "processing",
-          p_reason:
-            "PayFast payment notification received",
-          p_metadata: {
-            payfast_payment_id:
-              payfastPaymentId
-          }
+      
+    const {
+      error: processingError
+    } = await supabase.rpc(
+      "transition_payment",
+      {
+        p_payment_id: payment.id,
+        p_new_status: "processing",
+        p_payfast_reference: payfastPaymentId,
+        p_payload: {
+          reason: "PayFast payment notification received",
+          payfast_payment_id: payfastPaymentId
         }
-      );
+      }
+    );
 
       if (processingError) {
         console.error(
@@ -606,26 +601,21 @@ export async function POST(
      * ---------------------------------------------------------
      */
 
+    
     const {
       error: paidError
     } = await supabase.rpc(
       "transition_payment",
       {
-        p_payment_id:
-          payment.id,
-        p_to_status:
-          "paid",
-        p_reason:
-          "PayFast payment confirmed",
-        p_metadata: {
-          payfast_payment_id:
-            payfastPaymentId,
-          amount_gross:
-            data.amount_gross,
-          amount_fee:
-            data.amount_fee ?? null,
-          amount_net:
-            data.amount_net ?? null
+        p_payment_id: payment.id,
+        p_new_status: "paid",
+        p_payfast_reference: payfastPaymentId,
+        p_payload: {
+          reason: "PayFast payment confirmed",
+          payfast_payment_id: payfastPaymentId,
+          amount_gross: data.amount_gross,
+          amount_fee: data.amount_fee ?? null,
+          amount_net: data.amount_net ?? null
         }
       }
     );
