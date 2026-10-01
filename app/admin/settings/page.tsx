@@ -9,16 +9,12 @@ type SettingsRecord = {
     support_phone?: string;
     default_region?: string;
   } | null;
-  payments: {
-    platform_fee_percent?: number;
-  } | null;
+  payments: { platform_fee_percent?: number } | null;
   provider_management: {
     require_approval?: boolean;
     service_categories?: string[];
   } | null;
-  booking_rules: {
-    customer_cancellation_enabled?: boolean;
-  } | null;
+  booking_rules: { customer_cancellation_enabled?: boolean } | null;
   notifications: {
     email_enabled?: boolean;
     booking_updates?: boolean;
@@ -171,29 +167,24 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       ) : null}
 
       <form action={savePlatformSettingsAction} className="settings-form stack-md">
-        <PageSection
-          title="General settings"
-          description="The public-facing platform identity and customer support contact details."
-        >
+        <PageSection title="General settings" description="The public-facing platform identity and customer support contact details.">
           <div className="settings-grid">
             <Field label="Platform name" name="platform_name" defaultValue={general.platform_name ?? "Mechanic Connect"} />
             <Field label="Support email" name="support_email" type="email" defaultValue={general.support_email ?? ""} />
             <Field label="Support phone" name="support_phone" defaultValue={general.support_phone ?? ""} />
             <Field label="Default region" name="default_region" defaultValue={general.default_region ?? "Gauteng, South Africa"} />
           </div>
+          <p className="muted settings-hint">These values are stored centrally. App-wide branding and contact links need to be connected to these settings separately.</p>
         </PageSection>
 
-        <PageSection
-          title="Payments and platform fees"
-          description="Configure the platform fee preference. PayFast credentials are deliberately not editable or displayed here."
-        >
+        <PageSection title="Payments and platform fees" description="Configure the platform fee preference. PayFast credentials are deliberately not editable or displayed here.">
           <div className="settings-grid">
             <Field
               label="Platform fee (%)"
               name="platform_fee_percent"
               type="number"
               defaultValue={payments.platform_fee_percent ?? 15}
-              hint="Stored as an administrative setting. The existing payment split currently uses its own database/function configuration; changing this value alone does not change live transaction calculations."
+              hint="Stored as an administrative setting. The existing payment split currently uses its own database/function configuration; changing this value alone does not change transaction calculations."
             />
             <div className="settings-info-card">
               <strong>PayFast configuration</strong>
@@ -202,49 +193,34 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           </div>
         </PageSection>
 
-        <PageSection
-          title="Provider management"
-          description="Set provider review preferences and maintain the list of supported service categories."
-        >
+        <PageSection title="Provider management" description="Maintain provider review preferences and supported service categories.">
           <div className="stack-md">
             <Toggle
               name="require_approval"
               label="Require administrator approval"
-              description="Keep new providers pending until an administrator reviews their profiles."
+              description="Stored preference only for now. Provider registration continues to require manual approval until this option is connected to the signup workflow."
               checked={providers.require_approval ?? true}
             />
             <label className="stack-sm">
               <strong>Service categories</strong>
-              <textarea
-                className="settings-input settings-textarea"
-                name="service_categories"
-                rows={3}
-                defaultValue={categories.join(", ")}
-                required
-              />
+              <textarea className="settings-input settings-textarea" name="service_categories" rows={3} defaultValue={categories.join(", ")} required />
               <span className="muted settings-hint">Separate categories with commas. These are saved preferences; provider search and registration currently use the existing application category list until integrated.</span>
             </label>
           </div>
         </PageSection>
 
-        <PageSection
-          title="Booking rules"
-          description="Customer cancellation preferences for the platform."
-        >
+        <PageSection title="Booking rules" description="Customer cancellation preferences for the platform.">
           <Toggle
             name="customer_cancellation_enabled"
             label="Allow customer cancellation"
-            description="Save the platform's cancellation preference. The current cancellation endpoint still follows its existing status rules until this setting is connected to that workflow."
+            description="Saved preference only. The current cancellation endpoint still follows its existing status rules until this setting is connected to that workflow."
             checked={bookingRules.customer_cancellation_enabled ?? true}
           />
         </PageSection>
 
-        <PageSection
-          title="Notifications"
-          description="Choose the platform's notification preferences. These values are saved, but are not yet used to suppress individual email or in-app notification flows."
-        >
+        <PageSection title="Notifications" description="These preferences are saved but are not yet used to suppress individual email or in-app notification flows.">
           <div className="stack-sm">
-            <Toggle name="email_enabled" label="Email notifications" description="Enable email notifications as a platform preference." checked={notifications.email_enabled ?? true} />
+            <Toggle name="email_enabled" label="Email notifications" description="Email notifications as a platform preference." checked={notifications.email_enabled ?? true} />
             <Toggle name="booking_updates" label="Booking updates" description="Booking requests and booking status changes." checked={notifications.booking_updates ?? true} />
             <Toggle name="quote_updates" label="Quote updates" description="Quote sent, approved, or declined." checked={notifications.quote_updates ?? true} />
             <Toggle name="payment_updates" label="Payment updates" description="Payment-related notifications." checked={notifications.payment_updates ?? true} />
@@ -255,12 +231,8 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         <div className="card settings-savebar">
           <div>
             <strong>Save platform settings</strong>
-            <p className="muted">
-              Only administrators can load or update these settings. Never enter passwords, API keys, merchant keys or passphrases here.
-            </p>
-            {settings.updated_at ? (
-              <p className="muted settings-hint">Last saved: {new Date(settings.updated_at).toLocaleString("en-ZA")}</p>
-            ) : null}
+            <p className="muted">Only administrators can load or update these settings. Never enter passwords, API keys, merchant keys or passphrases here.</p>
+            {settings.updated_at ? <p className="muted settings-hint">Last saved: {new Date(settings.updated_at).toLocaleString("en-ZA")}</p> : null}
           </div>
           <button type="submit" className="button-primary">Save settings</button>
         </div>
