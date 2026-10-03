@@ -144,6 +144,21 @@ export async function updateQuoteStatus(
     "payment_updates"
   );
 
+  const { data: customerProfile } = await supabase
+    .from("profiles")
+    .select("email")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (customerProfile?.email) {
+    await sendNotification({
+      to: customerProfile.email,
+      subject: "Payment required for your approved quote",
+      html: "<p>Your quote was approved. Complete payment from your customer dashboard to allow the provider to begin work.</p>",
+      text: "Your quote was approved. Complete payment from your customer dashboard to allow the provider to begin work."
+    }, "payment_updates");
+  }
+
   revalidatePath("/customer");
   revalidatePath("/provider");
 }
