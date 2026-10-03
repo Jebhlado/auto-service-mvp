@@ -5,6 +5,72 @@ import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sendNotification } from "@/lib/notifications";
+import { createNotification } from "@/lib/create-notification";
+import { getPlatformSettings } from "@/lib/platform-settings";
+
+export async function saveProviderProfileAction(input: {
+  businessName: string;
+  service: string;
+  location: string;
+  contactEmail: string;
+  contactPhone: string;
+  bio: string;
+}) {
+  const { user } = await requireRole(["provider"]);
+  const settings = await getPlatformSettings();
+
+  const businessName = input.businessName.trim().slice(0, 120);
+  const service = input.service.trim();
+  const location = input.location.trim().slice(0, 160);
+  const contactEmail = input.contactEmail.trim().slice(0, 254);
+  const contactPhone = input.contactPhone.trim().slice(0, 40);
+  const bio = input.bio.trim().slice(0, 2000);
+
+  if (!businessName || !service || !location || !contactEmail || !contactPhone) {
+    return { success: false, message: "Complete all required profile fields." };
+  }
+
+  if (!settings.provider_management.service_categories.includes(service)) {
+    return { success: false, message: "This service category is no longer available. Refresh the page and choose an available category." };
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
+    return { success: false, message: "Enter a valid contact email address." };
+  }
+
+  const requireApproval = settings.provider_management.require_approval;
+  const approvalStatus = requireApproval ? "pending" : "approved";
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("provider_profiles").upsert({
+    user_id: user.id,
+    business_name: businessName,
+    services: [service],
+    location,
+    contact_email: contactEmail,
+    contact_phone: contactPhone,
+    bio,
+    approval_status: approvalStatus,
+    is_active: !requireApproval,
+    approved_at: requireApproval ? null : new Date().toISOString(),
+  });
+
+  if (error) {
+    console.error("Provider profile save failed:", error.message);
+    return { success: false, message: "Your provider profile could not be saved. Please try again." };
+  }
+
+  revalidatePath("/provider");
+  revalidatePath("/customer");
+  revalidatePath("/admin/providers");
+
+  return {
+    success: true,
+    message: requireApproval
+      ? "Your profile was saved and sent for administrator review."
+      : "Your profile is approved and active. Customers can now find your services.",
+  };
+}
 
 export async function createBookingAction(formData: FormData) {
   const { user, profile } = await requireRole(["customer"]);
