@@ -182,7 +182,7 @@ export async function confirmCompletedJob(
   const { data: booking, error: bookingError } =
     await supabase
       .from("bookings")
-      .select("id, customer_id, status")
+      .select("id, customer_id, provider_id, status")
       .eq("id", bookingId)
       .eq("customer_id", user.id)
       .single();
@@ -212,6 +212,28 @@ export async function confirmCompletedJob(
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  await createNotification(
+    booking.provider_id,
+    "Job completion confirmed",
+    "The customer confirmed that the job is complete.",
+    "completion_updates"
+  );
+
+  const { data: provider } = await supabase
+    .from("provider_profiles")
+    .select("contact_email")
+    .eq("user_id", booking.provider_id)
+    .maybeSingle();
+
+  if (provider?.contact_email) {
+    await sendNotification({
+      to: provider.contact_email,
+      subject: "Customer confirmed job completion",
+      html: "<p>The customer confirmed that the job is complete.</p>",
+      text: "The customer confirmed that the job is complete."
+    }, "completion_updates");
   }
 
   revalidatePath("/customer");
