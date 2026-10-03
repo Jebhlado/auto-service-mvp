@@ -10,6 +10,7 @@ import { formatServices } from "@/lib/utils";
 import { getBookingAttachmentUrl } from "@/lib/attachments";
 import type { ProviderProfileRecord } from "@/lib/types";
 import { PayFastCheckoutButton } from "@/components/customer/PayFastCheckoutButton";
+import { getPlatformSettings } from "@/lib/platform-settings";
 
 type CustomerPageProps = {
   searchParams: Promise<{
@@ -125,6 +126,8 @@ export default async function CustomerPage({ searchParams }: CustomerPageProps) 
   const location = params.location?.trim() ?? "";
   const service = params.service?.trim() ?? "";
   const supabase = await createClient();
+  const platformSettings = await getPlatformSettings();
+  const serviceCategories = platformSettings.provider_management.service_categories;
   const {
   data: {
     user
@@ -620,9 +623,9 @@ customerBookings = bookingsWithAttachments;
   {/* SERVICE DROPDOWN */}
   <select name="service" defaultValue={service}>
     <option value="">All services</option>
-    <option value="Mechanic">Mechanic</option>
-    <option value="Auto electrician">Auto Electrician</option>
-    <option value="Panel beater">Panel Beater</option>
+    {serviceCategories.map((category) => (
+      <option key={category} value={category}>{category}</option>
+    ))}
   </select>
 
   <button className="button-primary" type="submit">
