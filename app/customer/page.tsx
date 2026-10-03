@@ -17,6 +17,7 @@ type CustomerPageProps = {
     location?: string;
     service?: string;
     success?: string;
+    error?: string;
   }>;
 };
 
@@ -221,6 +222,18 @@ customerBookings = bookingsWithAttachments;
         <div className="card" style={{ marginBottom: "1rem" }}>
           <strong>Booking request sent</strong>
           <p className="muted">Your appointment was created with a pending status and is waiting for provider review.</p>
+        </div>
+      ) : null}
+
+      {params.error === "customer-cancellation-disabled" ? (
+        <div className="card" role="alert" style={{ marginBottom: "1rem" }}>
+          <strong>Cancellation is currently unavailable</strong>
+          <p className="muted">The platform administrator has temporarily disabled customer cancellations. Please contact support if you need help with this booking.</p>
+        </div>
+      ) : params.error === "booking-cannot-be-cancelled" ? (
+        <div className="card" role="alert" style={{ marginBottom: "1rem" }}>
+          <strong>This booking cannot be cancelled</strong>
+          <p className="muted">The booking may have changed status or may no longer be eligible for customer cancellation.</p>
         </div>
       ) : null}
 
