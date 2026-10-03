@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { markJobComplete, savePayfastAccountAction, sendQuoteAction, updateBookingStatusAction } from "@/app/provider/actions";
-import { GAUTENG_LOCATIONS, PROVIDER_SPECIALISTS } from "@/lib/provider-options";
+import { markJobComplete, savePayfastAccountAction, saveProviderProfileAction, sendQuoteAction, updateBookingStatusAction } from "@/app/provider/actions";
+import { GAUTENG_LOCATIONS } from "@/lib/provider-options";
 import type { BookingRecord, ProfileRecord, ProviderProfileRecord } from "@/lib/types";
 
 type ProviderDashboardState = {
@@ -41,7 +41,7 @@ type ProviderDashboardBooking = BookingRecord & {
   } | null;
 };
 
-export function ProviderDashboardClient() {
+export function ProviderDashboardClient({ serviceCategories }: { serviceCategories: string[] }) {
   const searchParams = useSearchParams();
   const [state, setState] = useState<ProviderDashboardState>({
   profile: null,
@@ -315,37 +315,23 @@ const averageRating =
   }, []);
 
   async function handleSaveProfile(formData: FormData) {
-    const supabase = createClient();
-    const {
-      data: { user }
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      setError("Please log in as a provider first.");
-      return;
-    }
-
-    const payload = {
-      user_id: user.id,
-      business_name: String(formData.get("businessName") ?? ""),
-      services: [String(formData.get("services") ?? "")],
+    const result = await saveProviderProfileAction({
+      businessName: String(formData.get("businessName") ?? ""),
+      service: String(formData.get("services") ?? ""),
       location: String(formData.get("location") ?? ""),
-      contact_email: String(formData.get("contactEmail") ?? ""),
-      contact_phone: String(formData.get("contactPhone") ?? ""),
+      contactEmail: String(formData.get("contactEmail") ?? ""),
+      contactPhone: String(formData.get("contactPhone") ?? ""),
       bio: String(formData.get("bio") ?? ""),
-      approval_status: "pending"
-    };
+    });
 
-    const { error: saveError } = await supabase.from("provider_profiles").upsert(payload);
-
-    if (saveError) {
-      setError(saveError.message);
+    if (!result.success) {
+      setError(result.message);
       setFeedback(null);
       return;
     }
 
     setError(null);
-    setFeedback("Thank you. Your provider profile was saved and sent for admin review.");
+    setFeedback(result.message);
     await loadDashboard();
   }
 
@@ -598,7 +584,7 @@ const averageRating =
             required
           />
           <select name="services" defaultValue={state.providerProfile?.services?.[0] ?? "Mechanic"} required>
-            {PROVIDER_SPECIALISTS.map((service) => (
+            {serviceCategories.map((service) => (
               <option key={service} value={service}>
                 {service}
               </option>
