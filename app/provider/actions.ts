@@ -211,7 +211,7 @@ export async function updateBookingStatusAction(
   const { data: booking, error: bookingError } =
     await supabase
       .from("bookings")
-      .select("id, provider_id, status")
+      .select("id, provider_id, customer_id, status")
       .eq("id", bookingId)
       .eq("provider_id", user.id)
       .single();
@@ -239,6 +239,33 @@ export async function updateBookingStatusAction(
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  const { data: customer } = await supabase
+    .from("profiles")
+    .select("email")
+    .eq("id", booking.customer_id)
+    .maybeSingle();
+
+  const notificationTitle = status === "confirmed" ? "Booking accepted" : "Booking declined";
+  const notificationMessage = status === "confirmed"
+    ? "Your provider accepted the booking request."
+    : "Your provider declined the booking request.";
+
+  await createNotification(
+    booking.customer_id,
+    notificationTitle,
+    notificationMessage,
+    "booking_updates"
+  );
+
+  if (customer?.email) {
+    await sendNotification({
+      to: customer.email,
+      subject: status === "confirmed" ? "Your booking was accepted" : "Your booking was declined",
+      html: `<p>${notificationMessage}</p>`,
+      text: notificationMessage
+    }, "booking_updates");
   }
 
   revalidatePath("/dashboard/provider");
