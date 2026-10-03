@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { approveQuoteAndCreatePayment } from "@/lib/payments";
 import { createPayfastCheckout } from "@/lib/payfast/checkout";
+import { sendNotification } from "@/lib/notifications";
+import { createNotification } from "@/lib/create-notification";
 
 export async function updateQuoteStatus(
   formData: FormData
@@ -68,6 +70,28 @@ export async function updateQuoteStatus(
       throw new Error(error.message);
     }
 
+    await createNotification(
+      booking.provider_id,
+      "Quote declined",
+      "The customer declined your quote. Review the booking before taking further action.",
+      "quote_updates"
+    );
+
+    const { data: provider } = await supabase
+      .from("provider_profiles")
+      .select("contact_email")
+      .eq("user_id", booking.provider_id)
+      .maybeSingle();
+
+    if (provider?.contact_email) {
+      await sendNotification({
+        to: provider.contact_email,
+        subject: "Customer declined your quote",
+        html: "<p>The customer has declined your quote. Sign in to review the booking.</p>",
+        text: "The customer has declined your quote. Sign in to review the booking."
+      }, "quote_updates");
+    }
+
     revalidatePath("/customer");
     revalidatePath("/provider");
 
@@ -90,6 +114,35 @@ export async function updateQuoteStatus(
   }
 
   await approveQuoteAndCreatePayment(bookingId);
+
+  await createNotification(
+    booking.provider_id,
+    "Quote approved",
+    "The customer approved your quote. Payment is now required before work can begin.",
+    "quote_updates"
+  );
+
+  const { data: provider } = await supabase
+    .from("provider_profiles")
+    .select("contact_email")
+    .eq("user_id", booking.provider_id)
+    .maybeSingle();
+
+  if (provider?.contact_email) {
+    await sendNotification({
+      to: provider.contact_email,
+      subject: "Your quote was approved",
+      html: "<p>The customer approved your quote. Payment is now required before work can begin.</p>",
+      text: "The customer approved your quote. Payment is now required before work can begin."
+    }, "quote_updates");
+  }
+
+  await createNotification(
+    user.id,
+    "Payment required",
+    "Your quote was approved. Complete payment to allow the provider to begin work.",
+    "payment_updates"
+  );
 
   revalidatePath("/customer");
   revalidatePath("/provider");
