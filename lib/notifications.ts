@@ -1,4 +1,4 @@
-import { getPlatformSettings, isNotificationEnabled, type NotificationCategory } from "@/lib/platform-settings";
+import { getPlatformSettings, type NotificationCategory } from "@/lib/platform-settings";
 
 type NotificationPayload = {
   to: string;
@@ -9,10 +9,10 @@ type NotificationPayload = {
 
 export async function sendNotification(
   payload: NotificationPayload,
-  category: NotificationCategory = "booking_updates",
+  category?: NotificationCategory,
 ) {
   const settings = await getPlatformSettings();
-  if (!isNotificationEnabled(settings, category)) {
+  if (!settings.notifications.email_enabled || (category && !settings.notifications[category])) {
     return { sent: false, skipped: true };
   }
 
