@@ -174,7 +174,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
             <Field label="Support phone" name="support_phone" defaultValue={general.support_phone ?? ""} />
             <Field label="Default region" name="default_region" defaultValue={general.default_region ?? "Gauteng, South Africa"} />
           </div>
-          <p className="muted settings-hint">These values are stored centrally. App-wide branding and contact links need to be connected to these settings separately.</p>
+          <p className="muted settings-hint">These values control the site name, page metadata, default region, and the support contact links shown in the site footer.</p>
         </PageSection>
 
         <PageSection title="Payments and platform fees" description="Configure the platform fee preference. PayFast credentials are deliberately not editable or displayed here.">
