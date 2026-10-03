@@ -169,7 +169,7 @@ export async function createBookingAction(formData: FormData) {
         <p>${issueDescription}</p>
       `,
       text: `${profile.full_name} requested an appointment for ${appointmentDate}. ${issueDescription}`
-    });
+    }, "booking_updates");
   }
 
   redirect("/customer?success=booking-created");
