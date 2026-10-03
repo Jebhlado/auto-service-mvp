@@ -91,7 +91,8 @@ export async function createBookingAction(formData: FormData) {
   await createNotification(
     providerId,
     "New Booking",
-    `${profile.full_name} submitted a new booking request.`
+    `${profile.full_name} submitted a new booking request.`,
+    "booking_updates"
   );
 
   const { data: provider } = await supabase
@@ -109,7 +110,7 @@ export async function createBookingAction(formData: FormData) {
         <p>${issueDescription}</p>
       `,
       text: `${profile.full_name} requested an appointment for ${appointmentDate}. ${issueDescription}`
-    });
+    }, "booking_updates");
   }
 
   redirect("/customer?success=booking-created");
