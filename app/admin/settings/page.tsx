@@ -184,7 +184,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
               name="platform_fee_percent"
               type="number"
               defaultValue={payments.platform_fee_percent ?? 15}
-              hint="Stored as an administrative setting. The existing payment split currently uses its own database/function configuration; changing this value alone does not change transaction calculations."
+              hint="This percentage is saved, but payment creation still uses the existing database function. We will connect and test the transaction calculation separately before relying on this value."
             />
             <div className="settings-info-card">
               <strong>PayFast configuration</strong>
@@ -193,32 +193,32 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           </div>
         </PageSection>
 
-        <PageSection title="Provider management" description="Maintain provider review preferences and supported service categories.">
+        <PageSection title="Provider management" description="Control provider approval and the service categories available in provider profiles and customer search.">
           <div className="stack-md">
             <Toggle
               name="require_approval"
               label="Require administrator approval"
-              description="Stored preference only for now. Provider registration continues to require manual approval until this option is connected to the signup workflow."
+              description="When enabled, provider profiles remain pending until an administrator approves them. When disabled, a valid provider profile is approved and activated automatically."
               checked={providers.require_approval ?? true}
             />
             <label className="stack-sm">
               <strong>Service categories</strong>
               <textarea className="settings-input settings-textarea" name="service_categories" rows={3} defaultValue={categories.join(", ")} required />
-              <span className="muted settings-hint">Separate categories with commas. These are saved preferences; provider search and registration currently use the existing application category list until integrated.</span>
+              <span className="muted settings-hint">Separate categories with commas. These categories are used by provider profile forms and customer service search.</span>
             </label>
           </div>
         </PageSection>
 
-        <PageSection title="Booking rules" description="Customer cancellation preferences for the platform.">
+        <PageSection title="Booking rules" description="Control whether customers may cancel eligible bookings from the customer dashboard.">
           <Toggle
             name="customer_cancellation_enabled"
             label="Allow customer cancellation"
-            description="Saved preference only. The current cancellation endpoint still follows its existing status rules until this setting is connected to that workflow."
+            description="When disabled, the server rejects customer cancellation requests. Existing booking status eligibility rules still apply when enabled."
             checked={bookingRules.customer_cancellation_enabled ?? true}
           />
         </PageSection>
 
-        <PageSection title="Notifications" description="These preferences are saved but are not yet used to suppress individual email or in-app notification flows.">
+        <PageSection title="Notifications" description="Control email and in-app notifications by category. Essential authentication messages outside this notification service are unaffected.">
           <div className="stack-sm">
             <Toggle name="email_enabled" label="Email notifications" description="Email notifications as a platform preference." checked={notifications.email_enabled ?? true} />
             <Toggle name="booking_updates" label="Booking updates" description="Booking requests and booking status changes." checked={notifications.booking_updates ?? true} />
