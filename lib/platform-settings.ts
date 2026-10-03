@@ -113,3 +113,10 @@ export function isNotificationEnabled(
 ): boolean {
   return settings.notifications.email_enabled && settings.notifications[category];
 }
+
+export function isInAppNotificationEnabled(
+  settings: PlatformSettings,
+  category: NotificationCategory,
+): boolean {
+  return settings.notifications[category];
+}
