@@ -12,7 +12,7 @@ export async function Footer() {
         {support_email || support_phone ? (
           <div className="inline-actions">
             {support_email ? <a href={`mailto:${support_email}`}>Support: {support_email}</a> : null}
-            {support_phone ? <a href={`tel:${support_phone.replace(/[^+\\d]/g, "")}`}>{support_phone}</a> : null}
+            {support_phone ? <a href={`tel:${support_phone.replace(/[^+\d]/g, "")}`}>{support_phone}</a> : null}
           </div>
         ) : (
           <p className="muted">Customer support contact details will appear here when configured by an administrator.</p>
