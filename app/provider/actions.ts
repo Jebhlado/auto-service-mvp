@@ -295,7 +295,7 @@ export async function sendQuoteAction(formData: FormData) {
   const { data: booking, error: bookingError } =
     await supabase
       .from("bookings")
-      .select("id, provider_id, status, quote_status")
+      .select("id, provider_id, customer_id, status, quote_status")
       .eq("id", bookingId)
       .eq("provider_id", user.id)
       .single();
@@ -352,6 +352,28 @@ export async function sendQuoteAction(formData: FormData) {
     };
   }
 
+  const { data: customer } = await supabase
+    .from("profiles")
+    .select("email")
+    .eq("id", booking.customer_id)
+    .maybeSingle();
+
+  await createNotification(
+    booking.customer_id,
+    "Quote received",
+    "Your service provider has sent you a quote to review.",
+    "quote_updates"
+  );
+
+  if (customer?.email) {
+    await sendNotification({
+      to: customer.email,
+      subject: "Your Mechanic Connect quote is ready",
+      html: `<p>Your service provider has sent a quote for R${total.toFixed(2)}. Sign in to review the details and decide whether to proceed.</p>`,
+      text: `Your service provider has sent a quote for R${total.toFixed(2)}. Sign in to review the details and decide whether to proceed.`
+    }, "quote_updates");
+  }
+
   revalidatePath("/provider");
   revalidatePath("/dashboard/provider");
   revalidatePath("/customer");
@@ -377,7 +399,19 @@ export async function markJobComplete(
 
   const supabase = await createClient();
 
-  const { error } = await supabase
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("id, customer_id")
+    .eq("id", bookingId)
+    .eq("provider_id", user.id)
+    .eq("status", "in_progress")
+    .maybeSingle();
+
+  if (!booking) {
+    throw new Error("Booking not found or is not in progress.");
+  }
+
+  const { data: updatedBooking, error } = await supabase
     .from("bookings")
     .update({
       status: "completed",
@@ -385,10 +419,34 @@ export async function markJobComplete(
     })
     .eq("id", bookingId)
     .eq("provider_id", user.id)
-    .eq("status", "in_progress");
+    .eq("status", "in_progress")
+    .select("id")
+    .maybeSingle();
 
-  if (error) {
-    throw new Error(error.message);
+  if (error || !updatedBooking) {
+    throw new Error(error?.message ?? "Booking could not be marked complete.");
+  }
+
+  await createNotification(
+    booking.customer_id,
+    "Job completed",
+    "Your provider has marked the job as complete. Review your booking and confirm completion when ready.",
+    "completion_updates"
+  );
+
+  const { data: customer } = await supabase
+    .from("profiles")
+    .select("email")
+    .eq("id", booking.customer_id)
+    .maybeSingle();
+
+  if (customer?.email) {
+    await sendNotification({
+      to: customer.email,
+      subject: "Your automotive service is marked complete",
+      html: "<p>Your provider has marked the job as complete. Sign in to review the booking and confirm completion when ready.</p>",
+      text: "Your provider has marked the job as complete. Sign in to review the booking and confirm completion when ready."
+    }, "completion_updates");
   }
 
   revalidatePath("/provider");
