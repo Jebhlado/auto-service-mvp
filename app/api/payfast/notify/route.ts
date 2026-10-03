@@ -1,6 +1,8 @@
 import "server-only";
 
 import { NextRequest, NextResponse } from "next/server";
+import { sendNotification } from "@/lib/notifications";
+import { createNotification } from "@/lib/create-notification";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPayfastConfig } from "@/lib/payfast/config";
 import {
@@ -633,9 +635,35 @@ export async function POST(
     /*
      * ---------------------------------------------------------
      * 13. Payment is now confirmed.
-     *
-     * Only NOW do we move the booking from confirmed
-     * to in_progress.
+     * Respect the platform's payment notification preferences.
+     * ---------------------------------------------------------
+     */
+
+    await createNotification(
+      payment.customer_id,
+      "Payment confirmed",
+      `Your payment of R${amountGross.toFixed(2)} has been confirmed.`,
+      "payment_updates"
+    );
+
+    const { data: customerProfile } = await supabase
+      .from("profiles")
+      .select("email")
+      .eq("id", payment.customer_id)
+      .maybeSingle();
+
+    if (customerProfile?.email) {
+      await sendNotification({
+        to: customerProfile.email,
+        subject: "Mechanic Connect payment confirmed",
+        html: `<p>Your payment of R${amountGross.toFixed(2)} has been confirmed. You can view the latest booking status from your customer dashboard.</p>`,
+        text: `Your payment of R${amountGross.toFixed(2)} has been confirmed. You can view the latest booking status from your customer dashboard.`
+      }, "payment_updates");
+    }
+
+    /*
+     * ---------------------------------------------------------
+     * 14. Move the booking to in_progress only after payment.
      * ---------------------------------------------------------
      */
 

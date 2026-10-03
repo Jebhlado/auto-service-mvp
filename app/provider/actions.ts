@@ -5,6 +5,75 @@ import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sendNotification } from "@/lib/notifications";
+import { createNotification } from "@/lib/create-notification";
+import { getPlatformSettings } from "@/lib/platform-settings";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+export async function saveProviderProfileAction(input: {
+  businessName: string;
+  service: string;
+  location: string;
+  contactEmail: string;
+  contactPhone: string;
+  bio: string;
+}) {
+  const { user } = await requireRole(["provider"]);
+  const settings = await getPlatformSettings();
+
+  const businessName = input.businessName.trim().slice(0, 120);
+  const service = input.service.trim();
+  const location = input.location.trim().slice(0, 160);
+  const contactEmail = input.contactEmail.trim().slice(0, 254);
+  const contactPhone = input.contactPhone.trim().slice(0, 40);
+  const bio = input.bio.trim().slice(0, 2000);
+
+  if (!businessName || !service || !location || !contactEmail || !contactPhone) {
+    return { success: false, message: "Complete all required profile fields." };
+  }
+
+  if (!settings.provider_management.service_categories.includes(service)) {
+    return { success: false, message: "This service category is no longer available. Refresh the page and choose an available category." };
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
+    return { success: false, message: "Enter a valid contact email address." };
+  }
+
+  const requireApproval = settings.provider_management.require_approval;
+  const approvalStatus = requireApproval ? "pending" : "approved";
+  // This privileged write is safe because the authenticated provider role was
+  // verified above and the target user_id always comes from the verified session.
+  const supabase = createAdminClient();
+
+  const { error } = await supabase.from("provider_profiles").upsert({
+    user_id: user.id,
+    business_name: businessName,
+    services: [service],
+    location,
+    contact_email: contactEmail,
+    contact_phone: contactPhone,
+    bio,
+    approval_status: approvalStatus,
+    is_active: !requireApproval,
+    approved_at: requireApproval ? null : new Date().toISOString(),
+  });
+
+  if (error) {
+    console.error("Provider profile save failed:", error.message);
+    return { success: false, message: "Your provider profile could not be saved. Please try again." };
+  }
+
+  revalidatePath("/provider");
+  revalidatePath("/customer");
+  revalidatePath("/admin/providers");
+
+  return {
+    success: true,
+    message: requireApproval
+      ? "Your profile was saved and sent for administrator review."
+      : "Your profile is approved and active. Customers can now find your services.",
+  };
+}
 
 export async function createBookingAction(formData: FormData) {
   const { user, profile } = await requireRole(["customer"]);
@@ -103,7 +172,7 @@ export async function createBookingAction(formData: FormData) {
         <p>${issueDescription}</p>
       `,
       text: `${profile.full_name} requested an appointment for ${appointmentDate}. ${issueDescription}`
-    });
+    }, "booking_updates");
   }
 
   redirect("/customer?success=booking-created");
@@ -142,7 +211,7 @@ export async function updateBookingStatusAction(
   const { data: booking, error: bookingError } =
     await supabase
       .from("bookings")
-      .select("id, provider_id, status")
+      .select("id, provider_id, customer_id, status")
       .eq("id", bookingId)
       .eq("provider_id", user.id)
       .single();
@@ -170,6 +239,33 @@ export async function updateBookingStatusAction(
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  const { data: customer } = await supabase
+    .from("profiles")
+    .select("email")
+    .eq("id", booking.customer_id)
+    .maybeSingle();
+
+  const notificationTitle = status === "confirmed" ? "Booking accepted" : "Booking declined";
+  const notificationMessage = status === "confirmed"
+    ? "Your provider accepted the booking request."
+    : "Your provider declined the booking request.";
+
+  await createNotification(
+    booking.customer_id,
+    notificationTitle,
+    notificationMessage,
+    "booking_updates"
+  );
+
+  if (customer?.email) {
+    await sendNotification({
+      to: customer.email,
+      subject: status === "confirmed" ? "Your booking was accepted" : "Your booking was declined",
+      html: `<p>${notificationMessage}</p>`,
+      text: notificationMessage
+    }, "booking_updates");
   }
 
   revalidatePath("/dashboard/provider");
@@ -229,7 +325,7 @@ export async function sendQuoteAction(formData: FormData) {
   const { data: booking, error: bookingError } =
     await supabase
       .from("bookings")
-      .select("id, provider_id, status, quote_status")
+      .select("id, provider_id, customer_id, status, quote_status")
       .eq("id", bookingId)
       .eq("provider_id", user.id)
       .single();
@@ -286,6 +382,28 @@ export async function sendQuoteAction(formData: FormData) {
     };
   }
 
+  const { data: customer } = await supabase
+    .from("profiles")
+    .select("email")
+    .eq("id", booking.customer_id)
+    .maybeSingle();
+
+  await createNotification(
+    booking.customer_id,
+    "Quote received",
+    "Your service provider has sent you a quote to review.",
+    "quote_updates"
+  );
+
+  if (customer?.email) {
+    await sendNotification({
+      to: customer.email,
+      subject: "Your Mechanic Connect quote is ready",
+      html: `<p>Your service provider has sent a quote for R${total.toFixed(2)}. Sign in to review the details and decide whether to proceed.</p>`,
+      text: `Your service provider has sent a quote for R${total.toFixed(2)}. Sign in to review the details and decide whether to proceed.`
+    }, "quote_updates");
+  }
+
   revalidatePath("/provider");
   revalidatePath("/dashboard/provider");
   revalidatePath("/customer");
@@ -311,7 +429,19 @@ export async function markJobComplete(
 
   const supabase = await createClient();
 
-  const { error } = await supabase
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("id, customer_id")
+    .eq("id", bookingId)
+    .eq("provider_id", user.id)
+    .eq("status", "in_progress")
+    .maybeSingle();
+
+  if (!booking) {
+    throw new Error("Booking not found or is not in progress.");
+  }
+
+  const { data: updatedBooking, error } = await supabase
     .from("bookings")
     .update({
       status: "completed",
@@ -319,10 +449,34 @@ export async function markJobComplete(
     })
     .eq("id", bookingId)
     .eq("provider_id", user.id)
-    .eq("status", "in_progress");
+    .eq("status", "in_progress")
+    .select("id")
+    .maybeSingle();
 
-  if (error) {
-    throw new Error(error.message);
+  if (error || !updatedBooking) {
+    throw new Error(error?.message ?? "Booking could not be marked complete.");
+  }
+
+  await createNotification(
+    booking.customer_id,
+    "Job completed",
+    "Your provider has marked the job as complete. Review your booking and confirm completion when ready.",
+    "completion_updates"
+  );
+
+  const { data: customer } = await supabase
+    .from("profiles")
+    .select("email")
+    .eq("id", booking.customer_id)
+    .maybeSingle();
+
+  if (customer?.email) {
+    await sendNotification({
+      to: customer.email,
+      subject: "Your automotive service is marked complete",
+      html: "<p>Your provider has marked the job as complete. Sign in to review the booking and confirm completion when ready.</p>",
+      text: "Your provider has marked the job as complete. Sign in to review the booking and confirm completion when ready."
+    }, "completion_updates");
   }
 
   revalidatePath("/provider");

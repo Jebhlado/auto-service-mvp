@@ -1,10 +1,15 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getPlatformSettings, isInAppNotificationEnabled, type NotificationCategory } from "@/lib/platform-settings";
 
 export async function createNotification(
   userId: string,
   title: string,
-  message: string
+  message: string,
+  category: NotificationCategory = "booking_updates",
 ) {
+  const settings = await getPlatformSettings();
+  if (!isInAppNotificationEnabled(settings, category)) return;
+
   const supabase = createAdminClient();
 
   const { error } = await supabase
@@ -16,7 +21,6 @@ export async function createNotification(
     });
 
   if (error) {
-    console.error("Notification creation failed:", error);
-    throw new Error(error.message);
+    console.error("Notification creation failed:", error.message);
   }
 }
