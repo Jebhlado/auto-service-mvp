@@ -1,3 +1,5 @@
+import { getPlatformSettings, isNotificationEnabled, type NotificationCategory } from "@/lib/platform-settings";
+
 type NotificationPayload = {
   to: string;
   subject: string;
@@ -5,12 +7,20 @@ type NotificationPayload = {
   text: string;
 };
 
-export async function sendNotification(payload: NotificationPayload) {
+export async function sendNotification(
+  payload: NotificationPayload,
+  category: NotificationCategory = "booking_updates",
+) {
+  const settings = await getPlatformSettings();
+  if (!isNotificationEnabled(settings, category)) {
+    return { sent: false, skipped: true };
+  }
+
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.NOTIFICATION_FROM_EMAIL;
 
   if (!apiKey || !from) {
-    console.info("Notification skipped. Configure RESEND_API_KEY and NOTIFICATION_FROM_EMAIL.", payload);
+    console.info("Notification skipped. Configure RESEND_API_KEY and NOTIFICATION_FROM_EMAIL.");
     return { sent: false };
   }
 
