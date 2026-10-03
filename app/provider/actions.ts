@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { sendNotification } from "@/lib/notifications";
 import { createNotification } from "@/lib/create-notification";
 import { getPlatformSettings } from "@/lib/platform-settings";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function saveProviderProfileAction(input: {
   businessName: string;
@@ -40,7 +41,9 @@ export async function saveProviderProfileAction(input: {
 
   const requireApproval = settings.provider_management.require_approval;
   const approvalStatus = requireApproval ? "pending" : "approved";
-  const supabase = await createClient();
+  // This privileged write is safe because the authenticated provider role was
+  // verified above and the target user_id always comes from the verified session.
+  const supabase = createAdminClient();
 
   const { error } = await supabase.from("provider_profiles").upsert({
     user_id: user.id,
