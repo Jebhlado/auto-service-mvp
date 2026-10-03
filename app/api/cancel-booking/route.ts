@@ -1,10 +1,16 @@
 import { createClient } from "@/lib/supabase/server";
 import { sendNotification } from "@/lib/notifications";
 import { redirect } from "next/navigation";
+import { getPlatformSettings } from "@/lib/platform-settings";
 
 export async function POST(request: Request) {
   const formData = await request.formData();
   const bookingId = String(formData.get("bookingId") ?? "");
+
+  const settings = await getPlatformSettings();
+  if (!settings.booking_rules.customer_cancellation_enabled) {
+    redirect("/customer?error=customer-cancellation-disabled");
+  }
 
   const supabase = await createClient();
 
@@ -63,7 +69,7 @@ export async function POST(request: Request) {
       subject: "Booking cancelled",
       html: `<p>A customer has cancelled their appointment.</p>`,
       text: "A customer cancelled their appointment."
-    });
+    }, "booking_updates");
   }
 
   redirect("/customer?success=booking-cancelled");
