@@ -11,12 +11,14 @@ import { getBookingAttachmentUrl } from "@/lib/attachments";
 import type { ProviderProfileRecord } from "@/lib/types";
 import { PayFastCheckoutButton } from "@/components/customer/PayFastCheckoutButton";
 import { getPlatformSettings } from "@/lib/platform-settings";
+import { PaymentReturnRefresh } from "@/components/customer/PaymentReturnRefresh";
 
 type CustomerPageProps = {
   searchParams: Promise<{
     location?: string;
     service?: string;
     success?: string;
+    payment?: string;
     error?: string;
   }>;
 };
@@ -222,6 +224,26 @@ customerBookings = bookingsWithAttachments;
         <div className="card" style={{ marginBottom: "1rem" }}>
           <strong>Booking request sent</strong>
           <p className="muted">Your appointment was created with a pending status and is waiting for provider review.</p>
+        </div>
+      ) : null}
+
+      {params.payment === "success" ? (
+        <>
+          <PaymentReturnRefresh />
+          <div className="card" style={{ marginBottom: "1rem" }}>
+            <strong>Payment submitted</strong>
+            <p className="muted">
+              PayFast has returned you to Mechanic Connect. We are confirming the payment now.
+              Once confirmation is received, the payment button will disappear automatically.
+            </p>
+          </div>
+        </>
+      ) : null}
+
+      {params.payment === "cancelled" ? (
+        <div className="card" style={{ marginBottom: "1rem" }}>
+          <strong>Payment cancelled</strong>
+          <p className="muted">The payment was cancelled. You can try again when you are ready.</p>
         </div>
       ) : null}
 
