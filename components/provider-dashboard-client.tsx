@@ -33,6 +33,9 @@ type ProviderDashboardState = {
 
 type ProviderDashboardBooking = BookingRecord & {
   attachmentUrl: string | null;
+  payment: {
+    status: string;
+  } | null;
   customer: {
     id: string;
     full_name: string;
@@ -190,10 +193,20 @@ setPayfastMerchantId(
   const customerIds =
   bookings?.map((booking) => booking.customer_id) ?? [];
 
-const { data: customers } = await supabase
-  .from("profiles")
-  .select("id, full_name, phone, email")
-  .in("id", customerIds);
+  const bookingIds =
+    bookings?.map((booking) => booking.id) ?? [];
+
+  const { data: customers } = await supabase
+    .from("profiles")
+    .select("id, full_name, phone, email")
+    .in("id", customerIds);
+
+  const { data: payments } = bookingIds.length
+    ? await supabase
+        .from("payments")
+        .select("booking_id, status")
+        .in("booking_id", bookingIds)
+    : { data: [] };
 
 const enrichedBookings = await Promise.all(
   (bookings ?? []).map(async (booking) => {
@@ -227,6 +240,10 @@ const enrichedBookings = await Promise.all(
     return {
       ...booking,
       attachmentUrl,
+      payment:
+        payments?.find(
+          (payment) => payment.booking_id === booking.id
+        ) ?? null,
       customer:
         customers?.find(
           (customer) => customer.id === booking.customer_id
@@ -833,39 +850,6 @@ const averageRating =
               ) : booking.status === "rejected" ||
                 booking.status === "cancelled" ? (
                 null
-              ) : booking.quote_status === "quote_sent" &&
-                booking.status === "in_progress" ? (
-                <div className="card">
-                  <strong>Accepted Quote</strong>
-
-                  <p>
-                    Service Price: R{booking.quote_service_price ?? 0}
-                  </p>
-
-                  <p>
-                    Call-out Fee: R{booking.quote_callout_fee ?? 0}
-                  </p>
-
-                  <p>
-                    Total: R{booking.quote_total ?? 0}
-                  </p>
-
-                  {booking.quote_estimated_time ? (
-                    <p>
-                      Estimated Time: {booking.quote_estimated_time}
-                    </p>
-                  ) : null}
-
-                  {booking.quote_warranty ? (
-                    <p>
-                      Warranty: {booking.quote_warranty}
-                    </p>
-                  ) : null}
-
-                  <p>
-                    Customer accepted this quote. Job is in progress.
-                  </p>
-                </div>
               ) : booking.quote_status === "quote_sent" ? (
                 <div className="card">
                   <strong>Quote Sent</strong>
@@ -896,6 +880,59 @@ const averageRating =
 
                   <p>
                     Waiting for customer approval.
+                  </p>
+                </div>
+              ) : booking.quote_status === "quote_approved" &&
+                booking.status === "confirmed" ? (
+                <div className="card">
+                  <strong>Quote Approved — Awaiting Payment</strong>
+
+                  <p>
+                    Total: R{booking.quote_total ?? 0}
+                  </p>
+
+                  <p>
+                    The customer approved this quote. Payment must be confirmed before the job can begin.
+                  </p>
+
+                  <p>
+                    Payment Status:{" "}
+                    {booking.payment?.status === "processing"
+                      ? "Processing"
+                      : "Awaiting Payment"}
+                  </p>
+                </div>
+              ) : booking.quote_status === "quote_approved" &&
+                booking.status === "in_progress" ? (
+                <div className="card">
+                  <strong>Payment Confirmed — Job In Progress</strong>
+
+                  <p>
+                    Service Price: R{booking.quote_service_price ?? 0}
+                  </p>
+
+                  <p>
+                    Call-out Fee: R{booking.quote_callout_fee ?? 0}
+                  </p>
+
+                  <p>
+                    Total: R{booking.quote_total ?? 0}
+                  </p>
+
+                  {booking.quote_estimated_time ? (
+                    <p>
+                      Estimated Time: {booking.quote_estimated_time}
+                    </p>
+                  ) : null}
+
+                  {booking.quote_warranty ? (
+                    <p>
+                      Warranty: {booking.quote_warranty}
+                    </p>
+                  ) : null}
+
+                  <p>
+                    PayFast has confirmed payment. The job can now proceed.
                   </p>
                 </div>
               ) : booking.status === "confirmed" ? (
