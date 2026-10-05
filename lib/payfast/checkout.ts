@@ -3,6 +3,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getPayfastConfig } from "./config";
 import { generatePayfastSignature } from "./signature";
+import { getPlatformSettings } from "@/lib/platform-settings";
 
 export type PayfastCheckout = {
   action: string;
@@ -136,10 +137,28 @@ if (
       "Automotive service booking"
   };
 
-  const setup = JSON.stringify({
+  const platformSettings = await getPlatformSettings();
+const platformFeePercent =
+  platformSettings.payments.platform_fee_percent;
+
+const providerPercentage = Number(
+  (100 - platformFeePercent).toFixed(2)
+);
+
+if (
+  !Number.isFinite(providerPercentage) ||
+  providerPercentage < 0 ||
+  providerPercentage > 100
+) {
+  throw new Error(
+    "Invalid platform fee configuration."
+  );
+}
+
+const setup = JSON.stringify({
   split_payment: {
     merchant_id: payfastMerchantId,
-    percentage: 85
+    percentage: providerPercentage
   }
 });
 
