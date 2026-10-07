@@ -113,6 +113,15 @@ if (
     );
   }
 
+  const notifyUrl =
+    process.env.PAYFAST_NOTIFY_URL?.replace(/\/$/, "");
+
+  if (!notifyUrl) {
+    throw new Error(
+      "Missing required environment variable: PAYFAST_NOTIFY_URL"
+    );
+  }
+
   const booking = Array.isArray(payment.booking)
     ? payment.booking[0]
     : payment.booking;
@@ -123,7 +132,7 @@ if (
 
     return_url: `${appBaseUrl}/customer?payment=success`,
     cancel_url: `${appBaseUrl}/customer?payment=cancelled`,
-    notify_url: `${appBaseUrl}/api/payfast/notify`,
+    notify_url: notifyUrl,
 
     name_first: customer.full_name.trim().split(/\s+/)[0],
     name_last: customer.full_name.trim().split(/\s+/).slice(1).join(" "),
