@@ -3,15 +3,41 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-export function PaymentReturnRefresh() {
+type PaymentReturnRefreshProps = {
+  bookingId?: string;
+};
+
+export function PaymentReturnRefresh({
+  bookingId
+}: PaymentReturnRefreshProps) {
   const router = useRouter();
 
   useEffect(() => {
     let elapsed = 0;
 
+    const scrollToBooking = () => {
+      if (!bookingId) {
+        return;
+      }
+
+      const bookingElement = document.getElementById(
+        `booking-${bookingId}`
+      );
+
+      bookingElement?.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    };
+
+    scrollToBooking();
+
     const interval = window.setInterval(() => {
       elapsed += 2000;
+
       router.refresh();
+
+      window.setTimeout(scrollToBooking, 100);
 
       if (elapsed >= 30000) {
         window.clearInterval(interval);
@@ -21,7 +47,7 @@ export function PaymentReturnRefresh() {
     return () => {
       window.clearInterval(interval);
     };
-  }, [router]);
+  }, [bookingId, router]);
 
   return null;
 }

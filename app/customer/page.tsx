@@ -19,6 +19,7 @@ type CustomerPageProps = {
     service?: string;
     success?: string;
     payment?: string;
+    booking?: string;
     error?: string;
   }>;
 };
@@ -128,6 +129,7 @@ export default async function CustomerPage({ searchParams }: CustomerPageProps) 
   const params = await searchParams;
   const location = params.location?.trim() ?? "";
   const service = params.service?.trim() ?? "";
+  const returnedBookingId = params.booking?.trim() ?? "";
   const supabase = await createClient();
   const platformSettings = await getPlatformSettings();
   const serviceCategories = platformSettings.provider_management.service_categories;
@@ -229,7 +231,7 @@ customerBookings = bookingsWithAttachments;
 
       {params.payment === "success" ? (
         <>
-          <PaymentReturnRefresh />
+          <PaymentReturnRefresh bookingId={returnedBookingId} />
           <div className="card" style={{ marginBottom: "1rem" }}>
             <strong>Payment submitted</strong>
             <p className="muted">
@@ -317,10 +319,11 @@ customerBookings = bookingsWithAttachments;
 
   {customerBookings.length ? (
     customerBookings.map((booking) => (
-      <article
-        key={booking.id}
-        className="card stack-sm"
-      >
+    <article
+      id={`booking-${booking.id}`}
+      key={booking.id}
+      className="card stack-sm"
+    >
         <div className="split-row">
           <strong>
             {booking.provider?.business_name ?? "Provider"}

@@ -130,8 +130,8 @@ if (
     merchant_id: config.merchantId,
     merchant_key: config.merchantKey,
 
-    return_url: `${appBaseUrl}/customer?payment=success`,
-    cancel_url: `${appBaseUrl}/customer?payment=cancelled`,
+    return_url: `${appBaseUrl}/customer?payment=success&booking=${payment.booking_id}`,
+    cancel_url: `${appBaseUrl}/customer?payment=cancelled&booking=${payment.booking_id}`,
     notify_url: notifyUrl,
 
     name_first: customer.full_name.trim().split(/\s+/)[0],
