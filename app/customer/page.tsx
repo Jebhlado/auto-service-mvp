@@ -12,6 +12,7 @@ import type { ProviderProfileRecord } from "@/lib/types";
 import { PayFastCheckoutButton } from "@/components/customer/PayFastCheckoutButton";
 import { getPlatformSettings } from "@/lib/platform-settings";
 import { PaymentReturnRefresh } from "@/components/customer/PaymentReturnRefresh";
+import { CustomerBookingRealtime } from "@/components/customer/CustomerBookingRealtime";
 
 type CustomerPageProps = {
   searchParams: Promise<{
@@ -263,6 +264,11 @@ customerBookings = bookingsWithAttachments;
 
       {/* CUSTOMER SECTION (TOP) */}
 <section className="section">
+
+  {user ? (
+    <CustomerBookingRealtime customerId={user.id} />
+  ) : null}
+  
   <div className="section-heading">
     <div>
       <div className="eyebrow">Customer</div>
