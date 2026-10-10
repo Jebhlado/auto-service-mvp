@@ -739,7 +739,36 @@ export async function POST(
 
     /*
      * ---------------------------------------------------------
-     * 14. ITN successfully processed
+     * 14. Notify the provider after payment is confirmed.
+     * The payment is not considered successful until PayFast's
+     * ITN validation and payment-state transition above succeed.
+     * ---------------------------------------------------------
+     */
+    await createNotification(
+      payment.provider_id,
+      "Payment received",
+      `The customer's payment of R${amountGross.toFixed(2)} has been confirmed. The booking is now ready to proceed.`,
+      "payment_updates"
+    );
+
+    const { data: providerProfile } = await supabase
+      .from("provider_profiles")
+      .select("contact_email")
+      .eq("user_id", payment.provider_id)
+      .maybeSingle();
+
+    if (providerProfile?.contact_email) {
+      await sendNotification({
+        to: providerProfile.contact_email,
+        subject: "Customer payment confirmed",
+        html: `<p>The customer's payment of R${amountGross.toFixed(2)} has been confirmed. Sign in to AutoCare Connect to view the booking and continue the job.</p>`,
+        text: `The customer's payment of R${amountGross.toFixed(2)} has been confirmed. Sign in to AutoCare Connect to view the booking and continue the job.`
+      }, "payment_updates");
+    }
+
+    /*
+     * ---------------------------------------------------------
+     * 15. ITN successfully processed
      * ---------------------------------------------------------
      */
 
