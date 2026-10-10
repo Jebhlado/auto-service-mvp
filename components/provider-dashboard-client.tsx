@@ -42,6 +42,11 @@ type ProviderDashboardBooking = BookingRecord & {
     phone: string | null;
     email: string;
   } | null;
+  review: {
+    rating: number;
+    review_text: string | null;
+    created_at: string;
+  } | null;
 };
 
 export function ProviderDashboardClient({ serviceCategories }: { serviceCategories: string[] }) {
@@ -208,6 +213,11 @@ setPayfastMerchantId(
         .in("booking_id", bookingIds)
     : { data: [] };
 
+const { data: reviews } = await supabase
+  .from("reviews")
+  .select("booking_id, customer_id, rating, review_text, created_at")
+  .eq("provider_id", user.id);
+
 const enrichedBookings = await Promise.all(
   (bookings ?? []).map(async (booking) => {
     let attachmentUrl: string | null = null;
@@ -247,7 +257,9 @@ const enrichedBookings = await Promise.all(
       customer:
         customers?.find(
           (customer) => customer.id === booking.customer_id
-        ) ?? null
+        ) ?? null,
+      review:
+        reviews?.find((review) => review.booking_id === booking.id) ?? null
     };
   })
 );
@@ -285,11 +297,6 @@ const totalRevenue =
         sum + (booking.quote_total ?? 0),
       0
     );
-
-const { data: reviews } = await supabase
-  .from("reviews")
-  .select("rating")
-  .eq("provider_id", user.id);
 
 const reviewCount =
   reviews?.length ?? 0;
@@ -915,17 +922,54 @@ const averageRating =
               </div>
               
               {booking.status === "closed" ? (
-                <div className="card">
-                  <strong>Job Closed</strong>
+                <>
+                  <div className="card">
+                    <strong>Job Closed</strong>
 
-                  <p>
-                    Total: R{booking.quote_total ?? 0}
-                  </p>
+                    <p>
+                      Total: R{booking.quote_total ?? 0}
+                    </p>
 
-                  <p>
-                    Customer has confirmed completion.
-                  </p>
-                </div>
+                    <p>
+                      Customer has confirmed completion.
+                    </p>
+                  </div>
+
+                  {booking.review ? (
+                    <div className="card stack-sm" aria-label="Customer review">
+                      <strong>Customer Review</strong>
+
+                      <div className="split-row">
+                        <div>
+                          <strong>{booking.customer?.full_name ?? "Customer"}</strong>
+                          <p className="muted">
+                            {new Date(booking.review.created_at).toLocaleDateString("en-ZA", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric"
+                            })}
+                          </p>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div
+                            aria-label={`${booking.review.rating} out of 5 stars`}
+                            style={{ color: "#f59e0b", letterSpacing: "0.1em" }}
+                          >
+                            {"★".repeat(booking.review.rating)}
+                            {"☆".repeat(5 - booking.review.rating)}
+                          </div>
+                          <strong>{booking.review.rating} / 5</strong>
+                        </div>
+                      </div>
+
+                      {booking.review.review_text ? (
+                        <p>{booking.review.review_text}</p>
+                      ) : (
+                        <p className="muted">The customer left a rating without written feedback.</p>
+                      )}
+                    </div>
+                  ) : null}
+                </>
               ) : booking.status === "completed" ? (
                 null
               ) : booking.status === "rejected" ||
