@@ -27,6 +27,7 @@ export async function POST(request: Request) {
     .select(`
       id,
       customer_id,
+      provider_id,
       status,
       provider:provider_profiles (
         contact_email,
@@ -62,6 +63,13 @@ export async function POST(request: Request) {
   const provider = Array.isArray(booking.provider)
     ? booking.provider[0]
     : booking.provider;
+
+  await createNotification(
+    booking.provider_id,
+    "Booking cancelled",
+    "A customer cancelled their appointment. Review the booking in your dashboard.",
+    "booking_updates"
+  );
 
   if (provider?.contact_email) {
     await sendNotification({
