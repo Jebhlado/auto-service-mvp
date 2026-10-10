@@ -209,7 +209,7 @@ setPayfastMerchantId(
   const { data: payments } = bookingIds.length
     ? await supabase
         .from("payments")
-        .select("booking_id, status")
+        .select("booking_id, status, provider_amount")
         .in("booking_id", bookingIds)
     : { data: [] };
 
@@ -287,14 +287,10 @@ const rejectedBookings =
   ).length;
 
 const totalRevenue =
-  enrichedBookings
-    .filter(
-      (booking) =>
-        booking.status === "closed"
-    )
+  (payments ?? [])
+    .filter((payment) => payment.status === "paid")
     .reduce(
-      (sum, booking) =>
-        sum + (booking.quote_total ?? 0),
+      (sum, payment) => sum + Number(payment.provider_amount ?? 0),
       0
     );
 
