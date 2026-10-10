@@ -163,6 +163,13 @@ export async function createBookingAction(formData: FormData) {
     .eq("user_id", providerId)
     .single();
 
+  await createNotification(
+    providerId,
+    "New booking request",
+    `${profile.full_name || "A customer"} requested an appointment for ${appointmentDate}.`,
+    "booking_updates"
+  );
+
   if (provider?.contact_email) {
     await sendNotification({
       to: provider.contact_email,
