@@ -96,8 +96,8 @@ export default async function ProviderEarningsPage() {
       payment.status === "disputed" ||
       payment.status === "chargeback",
   );
-  const hasEstimatedFees = paidPayments.some(
-    (payment) => payment.fee_snapshot_source === "estimated_legacy",
+  const hasHistoricalFeeSnapshots = paidPayments.some(
+    (payment) => payment.fee_snapshot_source === "existing_record",
   );
 
   return (
@@ -147,11 +147,11 @@ export default async function ProviderEarningsPage() {
         </article>
       </div>
 
-      {hasEstimatedFees ? (
+      {hasHistoricalFeeSnapshots ? (
         <div className="card">
-          <strong>Some historical fee values are estimates</strong>
+          <strong>Historical fee rates were derived from recorded amounts</strong>
           <p className="muted">
-            Older transactions did not store the fee rate used at checkout. They were backfilled using the configured rate at migration time; new payments will keep their own fee snapshot.
+            Historical fee percentages were derived from each transaction’s existing recorded platform fee and gross amount. The migration preserves the existing platform fee and provider share amounts; new payments will store their fee-rate snapshot.
           </p>
         </div>
       ) : null}
@@ -178,10 +178,10 @@ export default async function ProviderEarningsPage() {
             {payments.map((payment) => {
               const booking = bookingFor(payment);
               const gross = amountOf(payment.amount);
-              const fee = amountOf(payment.platform_fee_amount);
+              const fee = amountOf(payment.platform_fee);
               const providerShare = amountOf(payment.provider_amount);
               const isPaid = PAID_STATUSES.has(payment.status);
-              const isEstimated = payment.fee_snapshot_source === "estimated_legacy";
+              const isHistoricalSnapshot = payment.fee_snapshot_source === "existing_record";
 
               return (
                 <article key={payment.id} className="card stack-sm">
@@ -215,8 +215,8 @@ export default async function ProviderEarningsPage() {
                       <p><strong>{money(providerShare)}</strong></p>
                     </div>
                   </div>
-                  {isEstimated ? (
-                    <p className="muted">Fee breakdown estimated from the configured rate at migration time.</p>
+                  {isHistoricalSnapshot ? (
+                    <p className="muted">Historical fee percentage derived from the recorded fee and gross amount.</p>
                   ) : null}
                   {payment.payfast_payment_id ? (
                     <p className="muted">PayFast reference: {payment.payfast_payment_id}</p>
