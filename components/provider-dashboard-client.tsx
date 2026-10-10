@@ -1015,7 +1015,29 @@ const averageRating =
 
                {booking.status === "pending" ? (
               <div className="inline-actions">
-                <form action={updateBookingStatusAction}>
+                <form
+                  action={(formData) => {
+                    startTransition(async () => {
+                      try {
+                        const result = await updateBookingStatusAction(formData);
+                        if (!result?.success) {
+                          setError(result?.message ?? "Booking could not be accepted.");
+                          setFeedback(null);
+                        } else {
+                          setError(null);
+                          setFeedback(result.message);
+                        }
+                        await loadDashboard();
+                      } catch (actionError) {
+                        setError(
+                          actionError instanceof Error
+                            ? actionError.message
+                            : "Booking could not be updated. Please try again."
+                        );
+                      }
+                    });
+                  }}
+                >
                   <input
                     type="hidden"
                     name="bookingId"
@@ -1029,12 +1051,35 @@ const averageRating =
                   <button
                     className="button-primary"
                     type="submit"
+                    disabled={isPending}
                   >
-                    Accept booking
+                    {isPending ? "Processing..." : "Accept booking"}
                   </button>
                 </form>
 
-                <form action={updateBookingStatusAction}>
+                <form
+                  action={(formData) => {
+                    startTransition(async () => {
+                      try {
+                        const result = await updateBookingStatusAction(formData);
+                        if (!result?.success) {
+                          setError(result?.message ?? "Booking could not be rejected.");
+                          setFeedback(null);
+                        } else {
+                          setError(null);
+                          setFeedback(result.message);
+                        }
+                        await loadDashboard();
+                      } catch (actionError) {
+                        setError(
+                          actionError instanceof Error
+                            ? actionError.message
+                            : "Booking could not be updated. Please try again."
+                        );
+                      }
+                    });
+                  }}
+                >
                   <input
                     type="hidden"
                     name="bookingId"
@@ -1048,8 +1093,9 @@ const averageRating =
                   <button
                     className="button-secondary"
                     type="submit"
+                    disabled={isPending}
                   >
-                    Reject booking
+                    {isPending ? "Processing..." : "Reject booking"}
                   </button>
                 </form>
               </div>
