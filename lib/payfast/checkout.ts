@@ -104,12 +104,25 @@ if (
 
   const config = getPayfastConfig();
 
-  const appBaseUrl =
+  // Vercel preview deployments must return to their own hostname so
+  // the customer's preview-domain auth cookies remain available.
+  // Production continues to use the stable canonical APP_BASE_URL.
+  const isPreviewDeployment =
+    process.env.VERCEL_ENV === "preview";
+
+  const previewHost = process.env.VERCEL_URL?.trim();
+  const configuredBaseUrl =
     process.env.APP_BASE_URL?.replace(/\/$/, "");
+
+  const appBaseUrl = isPreviewDeployment && previewHost
+    ? `https://${previewHost.replace(/^https?:\/\//, "").replace(/\/$/, "")}`
+    : configuredBaseUrl;
 
   if (!appBaseUrl) {
     throw new Error(
-      "Missing required environment variable: APP_BASE_URL"
+      isPreviewDeployment
+        ? "Missing VERCEL_URL for the preview return URL."
+        : "Missing required environment variable: APP_BASE_URL"
     );
   }
 
