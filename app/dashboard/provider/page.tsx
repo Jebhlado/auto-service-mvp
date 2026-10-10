@@ -85,9 +85,9 @@ export default async function ProviderDashboardPage() {
               {booking.status === "pending" ? (
                 <div className="inline-actions">
                   <form
-                    action={
-                      updateBookingStatusAction
-                    }
+                    action={async (formData) => {
+                      await updateBookingStatusAction(formData);
+                    }}
                   >
                     <input
                       type="hidden"
@@ -110,9 +110,9 @@ export default async function ProviderDashboardPage() {
                   </form>
 
                   <form
-                    action={
-                      updateBookingStatusAction
-                    }
+                    action={async (formData) => {
+                      await updateBookingStatusAction(formData);
+                    }}
                   >
                     <input
                       type="hidden"
