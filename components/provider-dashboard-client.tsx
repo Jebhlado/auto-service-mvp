@@ -658,7 +658,7 @@ const averageRating =
 
 <div className="card">
   <strong>R{state.totalRevenue.toLocaleString()}</strong>
-  <p>Revenue</p>
+  <p>Net Earnings (Paid)</p>
 </div>
 
 <div className="card">
