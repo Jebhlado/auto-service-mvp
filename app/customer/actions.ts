@@ -337,6 +337,42 @@ export async function createReview(
     throw new Error(error.message);
   }
 
+  const reviewSummary = reviewText
+    ? `A customer gave you ${rating}/5 stars: ${reviewText}`
+    : `A customer gave your service ${rating}/5 stars.`;
+
+  await createNotification(
+    booking.provider_id,
+    "New customer review",
+    reviewSummary
+  );
+
+  const { data: providerProfile } = await supabase
+    .from("provider_profiles")
+    .select("contact_email")
+    .eq("user_id", booking.provider_id)
+    .maybeSingle();
+
+  if (providerProfile?.contact_email) {
+    const escapedReview = reviewText
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+
+    const reviewMessage = reviewText
+      ? `The customer rated your service ${rating}/5 stars and wrote: "${reviewText}"`
+      : `The customer rated your service ${rating}/5 stars.`;
+
+    await sendNotification({
+      to: providerProfile.contact_email,
+      subject: `You received a ${rating}-star customer review`,
+      html: `<p>A customer reviewed a completed booking.</p><p><strong>Rating:</strong> ${rating}/5 stars</p>${escapedReview ? `<p><strong>Review:</strong> ${escapedReview}</p>` : "<p>The customer left a rating without written feedback.</p>"}`,
+      text: reviewMessage
+    });
+  }
+
   revalidatePath("/customer");
   revalidatePath("/provider");
   revalidatePath(
