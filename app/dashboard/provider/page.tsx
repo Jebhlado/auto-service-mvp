@@ -85,7 +85,8 @@ export default async function ProviderDashboardPage() {
               {booking.status === "pending" ? (
                 <div className="inline-actions">
                   <form
-                    action={async (formData) => {
+                    action={async (formData: FormData) => {
+                      "use server";
                       await updateBookingStatusAction(formData);
                     }}
                   >
@@ -110,7 +111,8 @@ export default async function ProviderDashboardPage() {
                   </form>
 
                   <form
-                    action={async (formData) => {
+                    action={async (formData: FormData) => {
+                      "use server";
                       await updateBookingStatusAction(formData);
                     }}
                   >
