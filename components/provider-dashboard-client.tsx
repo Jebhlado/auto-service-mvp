@@ -95,7 +95,7 @@ export function ProviderDashboardClient({ serviceCategories }: { serviceCategori
   const onboarding = searchParams.get("onboarding") === "1";
   
 
-  async function loadDashboard() {
+  async function loadDashboard(markNotificationsRead = true) {
   const supabase = createClient();
 
   const {
@@ -182,7 +182,7 @@ setPayfastMerchantId(
   .eq("user_id", user.id)
   .order("created_at", { ascending: false });
 
-  if (notifications?.length) {
+  if (markNotificationsRead && notifications?.length) {
   await supabase
     .from("notifications")
     .update({ is_read: true })
@@ -328,7 +328,88 @@ const averageRating =
   setLoading(false);
 }
   useEffect(() => {
-    loadDashboard();
+    void loadDashboard();
+  }, []);
+
+  // Keep the provider dashboard in sync with customer quote decisions,
+  // booking lifecycle changes, and new notifications without a manual refresh.
+  useEffect(() => {
+    let active = true;
+    let refreshInFlight = false;
+    let channel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
+    let refreshInterval: ReturnType<typeof setInterval> | null = null;
+
+    async function startLiveUpdates() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!active || !user) return;
+
+      channel = supabase
+        .channel(`provider-dashboard-${user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "bookings",
+            filter: `provider_id=eq.${user.id}`
+          },
+          () => {
+            if (active && !refreshInFlight) {
+              refreshInFlight = true;
+              void loadDashboard(false).finally(() => {
+                refreshInFlight = false;
+              });
+            }
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${user.id}`
+          },
+          () => {
+            if (active && !refreshInFlight) {
+              refreshInFlight = true;
+              void loadDashboard(false).finally(() => {
+                refreshInFlight = false;
+              });
+            }
+          }
+        )
+        .subscribe((status, error) => {
+          console.info("Provider dashboard realtime status:", status);
+          if (error) {
+            console.warn("Provider dashboard realtime error:", error.message);
+          }
+        });
+
+      // Polling is a safety net for payment rows or Realtime events that are
+      // not delivered. Do not mark notifications read during background refresh.
+      refreshInterval = setInterval(() => {
+        if (active && !refreshInFlight) {
+          refreshInFlight = true;
+          void loadDashboard(false).finally(() => {
+            refreshInFlight = false;
+          });
+        }
+      }, 10000);
+    }
+
+    void startLiveUpdates();
+
+    return () => {
+      active = false;
+      if (refreshInterval) clearInterval(refreshInterval);
+      if (channel) {
+        const supabase = createClient();
+        void supabase.removeChannel(channel);
+      }
+    };
   }, []);
 
   async function handleSaveProfile(formData: FormData) {
