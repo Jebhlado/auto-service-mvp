@@ -11,7 +11,7 @@ type EarningsPayment = {
   created_at: string;
   payfast_payment_id: string | null;
   platform_fee_percent: number | string | null;
-  platform_fee_amount: number | string | null;
+  platform_fee: number | string | null;
   provider_amount: number | string | null;
   fee_snapshot_source: string | null;
   booking:
@@ -69,7 +69,7 @@ export default async function ProviderEarningsPage() {
   const { data, error } = await supabase
     .from("payments")
     .select(
-      "id, booking_id, amount, currency, status, created_at, payfast_payment_id, platform_fee_percent, platform_fee_amount, provider_amount, fee_snapshot_source, booking:bookings(id, issue_description, appointment_date)"
+      "id, booking_id, amount, currency, status, created_at, payfast_payment_id, platform_fee_percent, platform_fee, provider_amount, fee_snapshot_source, booking:bookings(id, issue_description, appointment_date)"
     )
     .eq("provider_id", user.id)
     .order("created_at", { ascending: false });
@@ -79,7 +79,7 @@ export default async function ProviderEarningsPage() {
 
   const grossPaid = paidPayments.reduce((sum, payment) => sum + amountOf(payment.amount), 0);
   const platformFees = paidPayments.reduce(
-    (sum, payment) => sum + amountOf(payment.platform_fee_amount),
+    (sum, payment) => sum + amountOf(payment.platform_fee),
     0,
   );
   const providerEarnings = paidPayments.reduce(
