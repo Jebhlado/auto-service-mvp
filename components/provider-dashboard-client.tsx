@@ -627,7 +627,10 @@ const averageRating =
       ) : null}
 
       <div className="inline-actions">
-        <Link href="/provider/earnings" className="button-secondary">View earnings &amp; payments</Link>
+        <div className="row gap-sm flex-wrap">
+          <Link href="/provider/earnings" className="button-secondary">View earnings &amp; payments</Link>
+          <Link href="/provider/reviews" className="button-secondary">View customer reviews</Link>
+        </div>
       </div>
 
       <div className="card-grid">
