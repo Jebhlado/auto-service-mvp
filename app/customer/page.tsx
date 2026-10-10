@@ -10,12 +10,18 @@ import { formatServices } from "@/lib/utils";
 import { getBookingAttachmentUrl } from "@/lib/attachments";
 import type { ProviderProfileRecord } from "@/lib/types";
 import { PayFastCheckoutButton } from "@/components/customer/PayFastCheckoutButton";
+import { getPlatformSettings } from "@/lib/platform-settings";
+import { PaymentReturnRefresh } from "@/components/customer/PaymentReturnRefresh";
+import { CustomerBookingRealtime } from "@/components/customer/CustomerBookingRealtime";
 
 type CustomerPageProps = {
   searchParams: Promise<{
     location?: string;
     service?: string;
     success?: string;
+    payment?: string;
+    booking?: string;
+    error?: string;
   }>;
 };
 
@@ -124,7 +130,10 @@ export default async function CustomerPage({ searchParams }: CustomerPageProps) 
   const params = await searchParams;
   const location = params.location?.trim() ?? "";
   const service = params.service?.trim() ?? "";
+  const returnedBookingId = params.booking?.trim() ?? "";
   const supabase = await createClient();
+  const platformSettings = await getPlatformSettings();
+  const serviceCategories = platformSettings.provider_management.service_categories;
   const {
   data: {
     user
@@ -221,8 +230,45 @@ customerBookings = bookingsWithAttachments;
         </div>
       ) : null}
 
+      {params.payment === "success" ? (
+        <>
+          <PaymentReturnRefresh bookingId={returnedBookingId} />
+          <div className="card" style={{ marginBottom: "1rem" }}>
+            <strong>Payment submitted</strong>
+            <p className="muted">
+              PayFast has returned you to Mechanic Connect. We are confirming the payment now.
+              Once confirmation is received, the payment button will disappear automatically.
+            </p>
+          </div>
+        </>
+      ) : null}
+
+      {params.payment === "cancelled" ? (
+        <div className="card" style={{ marginBottom: "1rem" }}>
+          <strong>Payment cancelled</strong>
+          <p className="muted">The payment was cancelled. You can try again when you are ready.</p>
+        </div>
+      ) : null}
+
+      {params.error === "customer-cancellation-disabled" ? (
+        <div className="card" role="alert" style={{ marginBottom: "1rem" }}>
+          <strong>Cancellation is currently unavailable</strong>
+          <p className="muted">The platform administrator has temporarily disabled customer cancellations. Please contact support if you need help with this booking.</p>
+        </div>
+      ) : params.error === "booking-cannot-be-cancelled" ? (
+        <div className="card" role="alert" style={{ marginBottom: "1rem" }}>
+          <strong>This booking cannot be cancelled</strong>
+          <p className="muted">The booking may have changed status or may no longer be eligible for customer cancellation.</p>
+        </div>
+      ) : null}
+
       {/* CUSTOMER SECTION (TOP) */}
 <section className="section">
+
+  {user ? (
+    <CustomerBookingRealtime customerId={user.id} />
+  ) : null}
+  
   <div className="section-heading">
     <div>
       <div className="eyebrow">Customer</div>
@@ -279,10 +325,11 @@ customerBookings = bookingsWithAttachments;
 
   {customerBookings.length ? (
     customerBookings.map((booking) => (
-      <article
-        key={booking.id}
-        className="card stack-sm"
-      >
+    <article
+      id={`booking-${booking.id}`}
+      key={booking.id}
+      className="card stack-sm"
+    >
         <div className="split-row">
           <strong>
             {booking.provider?.business_name ?? "Provider"}
@@ -620,9 +667,9 @@ customerBookings = bookingsWithAttachments;
   {/* SERVICE DROPDOWN */}
   <select name="service" defaultValue={service}>
     <option value="">All services</option>
-    <option value="Mechanic">Mechanic</option>
-    <option value="Auto electrician">Auto Electrician</option>
-    <option value="Panel beater">Panel Beater</option>
+    {serviceCategories.map((category) => (
+      <option key={category} value={category}>{category}</option>
+    ))}
   </select>
 
   <button className="button-primary" type="submit">

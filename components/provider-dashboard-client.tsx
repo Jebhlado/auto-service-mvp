@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { markJobComplete, savePayfastAccountAction, sendQuoteAction, updateBookingStatusAction } from "@/app/provider/actions";
-import { GAUTENG_LOCATIONS, PROVIDER_SPECIALISTS } from "@/lib/provider-options";
+import { markJobComplete, savePayfastAccountAction, saveProviderProfileAction, sendQuoteAction, updateBookingStatusAction } from "@/app/provider/actions";
+import { GAUTENG_LOCATIONS } from "@/lib/provider-options";
 import type { BookingRecord, ProfileRecord, ProviderProfileRecord } from "@/lib/types";
 
 type ProviderDashboardState = {
@@ -33,15 +33,23 @@ type ProviderDashboardState = {
 
 type ProviderDashboardBooking = BookingRecord & {
   attachmentUrl: string | null;
+  payment: {
+    status: string;
+  } | null;
   customer: {
     id: string;
     full_name: string;
     phone: string | null;
     email: string;
   } | null;
+  review: {
+    rating: number;
+    review_text: string | null;
+    created_at: string;
+  } | null;
 };
 
-export function ProviderDashboardClient() {
+export function ProviderDashboardClient({ serviceCategories }: { serviceCategories: string[] }) {
   const searchParams = useSearchParams();
   const [state, setState] = useState<ProviderDashboardState>({
   profile: null,
@@ -92,7 +100,7 @@ export function ProviderDashboardClient() {
   const onboarding = searchParams.get("onboarding") === "1";
   
 
-  async function loadDashboard() {
+  async function loadDashboard(markNotificationsRead = true) {
   const supabase = createClient();
 
   const {
@@ -179,7 +187,7 @@ setPayfastMerchantId(
   .eq("user_id", user.id)
   .order("created_at", { ascending: false });
 
-  if (notifications?.length) {
+  if (markNotificationsRead && notifications?.length) {
   await supabase
     .from("notifications")
     .update({ is_read: true })
@@ -190,10 +198,25 @@ setPayfastMerchantId(
   const customerIds =
   bookings?.map((booking) => booking.customer_id) ?? [];
 
-const { data: customers } = await supabase
-  .from("profiles")
-  .select("id, full_name, phone, email")
-  .in("id", customerIds);
+  const bookingIds =
+    bookings?.map((booking) => booking.id) ?? [];
+
+  const { data: customers } = await supabase
+    .from("profiles")
+    .select("id, full_name, phone, email")
+    .in("id", customerIds);
+
+  const { data: payments } = bookingIds.length
+    ? await supabase
+        .from("payments")
+        .select("booking_id, status")
+        .in("booking_id", bookingIds)
+    : { data: [] };
+
+const { data: reviews } = await supabase
+  .from("reviews")
+  .select("booking_id, customer_id, rating, review_text, created_at")
+  .eq("provider_id", user.id);
 
 const enrichedBookings = await Promise.all(
   (bookings ?? []).map(async (booking) => {
@@ -227,10 +250,16 @@ const enrichedBookings = await Promise.all(
     return {
       ...booking,
       attachmentUrl,
+      payment:
+        payments?.find(
+          (payment) => payment.booking_id === booking.id
+        ) ?? null,
       customer:
         customers?.find(
           (customer) => customer.id === booking.customer_id
-        ) ?? null
+        ) ?? null,
+      review:
+        reviews?.find((review) => review.booking_id === booking.id) ?? null
     };
   })
 );
@@ -269,11 +298,6 @@ const totalRevenue =
       0
     );
 
-const { data: reviews } = await supabase
-  .from("reviews")
-  .select("rating")
-  .eq("provider_id", user.id);
-
 const reviewCount =
   reviews?.length ?? 0;
 
@@ -311,41 +335,108 @@ const averageRating =
   setLoading(false);
 }
   useEffect(() => {
-    loadDashboard();
+    void loadDashboard();
+  }, []);
+
+  // Keep the provider dashboard in sync with customer quote decisions,
+  // booking lifecycle changes, and new notifications without a manual refresh.
+  useEffect(() => {
+    let active = true;
+    let refreshInFlight = false;
+    let channel: ReturnType<ReturnType<typeof createClient>["channel"]> | null = null;
+    let refreshInterval: ReturnType<typeof setInterval> | null = null;
+
+    async function startLiveUpdates() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!active || !user) return;
+
+      channel = supabase
+        .channel(`provider-dashboard-${user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "bookings",
+            filter: `provider_id=eq.${user.id}`
+          },
+          () => {
+            if (active && !refreshInFlight) {
+              refreshInFlight = true;
+              void loadDashboard(false).finally(() => {
+                refreshInFlight = false;
+              });
+            }
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${user.id}`
+          },
+          () => {
+            if (active && !refreshInFlight) {
+              refreshInFlight = true;
+              void loadDashboard(false).finally(() => {
+                refreshInFlight = false;
+              });
+            }
+          }
+        )
+        .subscribe((status, error) => {
+          console.info("Provider dashboard realtime status:", status);
+          if (error) {
+            console.warn("Provider dashboard realtime error:", error.message);
+          }
+        });
+
+      // Polling is a safety net for payment rows or Realtime events that are
+      // not delivered. Do not mark notifications read during background refresh.
+      refreshInterval = setInterval(() => {
+        if (active && !refreshInFlight) {
+          refreshInFlight = true;
+          void loadDashboard(false).finally(() => {
+            refreshInFlight = false;
+          });
+        }
+      }, 10000);
+    }
+
+    void startLiveUpdates();
+
+    return () => {
+      active = false;
+      if (refreshInterval) clearInterval(refreshInterval);
+      if (channel) {
+        const supabase = createClient();
+        void supabase.removeChannel(channel);
+      }
+    };
   }, []);
 
   async function handleSaveProfile(formData: FormData) {
-    const supabase = createClient();
-    const {
-      data: { user }
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      setError("Please log in as a provider first.");
-      return;
-    }
-
-    const payload = {
-      user_id: user.id,
-      business_name: String(formData.get("businessName") ?? ""),
-      services: [String(formData.get("services") ?? "")],
+    const result = await saveProviderProfileAction({
+      businessName: String(formData.get("businessName") ?? ""),
+      service: String(formData.get("services") ?? ""),
       location: String(formData.get("location") ?? ""),
-      contact_email: String(formData.get("contactEmail") ?? ""),
-      contact_phone: String(formData.get("contactPhone") ?? ""),
+      contactEmail: String(formData.get("contactEmail") ?? ""),
+      contactPhone: String(formData.get("contactPhone") ?? ""),
       bio: String(formData.get("bio") ?? ""),
-      approval_status: "pending"
-    };
+    });
 
-    const { error: saveError } = await supabase.from("provider_profiles").upsert(payload);
-
-    if (saveError) {
-      setError(saveError.message);
+    if (!result.success) {
+      setError(result.message);
       setFeedback(null);
       return;
     }
 
     setError(null);
-    setFeedback("Thank you. Your provider profile was saved and sent for admin review.");
+    setFeedback(result.message);
     await loadDashboard();
   }
 
@@ -598,7 +689,7 @@ const averageRating =
             required
           />
           <select name="services" defaultValue={state.providerProfile?.services?.[0] ?? "Mechanic"} required>
-            {PROVIDER_SPECIALISTS.map((service) => (
+            {serviceCategories.map((service) => (
               <option key={service} value={service}>
                 {service}
               </option>
@@ -831,55 +922,59 @@ const averageRating =
               </div>
               
               {booking.status === "closed" ? (
-                <div className="card">
-                  <strong>Job Closed</strong>
+                <>
+                  <div className="card">
+                    <strong>Job Closed</strong>
 
-                  <p>
-                    Total: R{booking.quote_total ?? 0}
-                  </p>
+                    <p>
+                      Total: R{booking.quote_total ?? 0}
+                    </p>
 
-                  <p>
-                    Customer has confirmed completion.
-                  </p>
-                </div>
+                    <p>
+                      Customer has confirmed completion.
+                    </p>
+                  </div>
+
+                  {booking.review ? (
+                    <div className="card stack-sm" aria-label="Customer review">
+                      <strong>Customer Review</strong>
+
+                      <div className="split-row">
+                        <div>
+                          <strong>{booking.customer?.full_name ?? "Customer"}</strong>
+                          <p className="muted">
+                            {new Date(booking.review.created_at).toLocaleDateString("en-ZA", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric"
+                            })}
+                          </p>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div
+                            aria-label={`${booking.review.rating} out of 5 stars`}
+                            style={{ color: "#f59e0b", letterSpacing: "0.1em" }}
+                          >
+                            {"★".repeat(booking.review.rating)}
+                            {"☆".repeat(5 - booking.review.rating)}
+                          </div>
+                          <strong>{booking.review.rating} / 5</strong>
+                        </div>
+                      </div>
+
+                      {booking.review.review_text ? (
+                        <p>{booking.review.review_text}</p>
+                      ) : (
+                        <p className="muted">The customer left a rating without written feedback.</p>
+                      )}
+                    </div>
+                  ) : null}
+                </>
               ) : booking.status === "completed" ? (
                 null
               ) : booking.status === "rejected" ||
                 booking.status === "cancelled" ? (
                 null
-              ) : booking.quote_status === "quote_sent" &&
-                booking.status === "in_progress" ? (
-                <div className="card">
-                  <strong>Accepted Quote</strong>
-
-                  <p>
-                    Service Price: R{booking.quote_service_price ?? 0}
-                  </p>
-
-                  <p>
-                    Call-out Fee: R{booking.quote_callout_fee ?? 0}
-                  </p>
-
-                  <p>
-                    Total: R{booking.quote_total ?? 0}
-                  </p>
-
-                  {booking.quote_estimated_time ? (
-                    <p>
-                      Estimated Time: {booking.quote_estimated_time}
-                    </p>
-                  ) : null}
-
-                  {booking.quote_warranty ? (
-                    <p>
-                      Warranty: {booking.quote_warranty}
-                    </p>
-                  ) : null}
-
-                  <p>
-                    Customer accepted this quote. Job is in progress.
-                  </p>
-                </div>
               ) : booking.quote_status === "quote_sent" ? (
                 <div className="card">
                   <strong>Quote Sent</strong>
@@ -910,6 +1005,59 @@ const averageRating =
 
                   <p>
                     Waiting for customer approval.
+                  </p>
+                </div>
+              ) : booking.quote_status === "quote_approved" &&
+                booking.status === "confirmed" ? (
+                <div className="card">
+                  <strong>Quote Approved — Awaiting Payment</strong>
+
+                  <p>
+                    Total: R{booking.quote_total ?? 0}
+                  </p>
+
+                  <p>
+                    The customer approved this quote. Payment must be confirmed before the job can begin.
+                  </p>
+
+                  <p>
+                    Payment Status:{" "}
+                    {booking.payment?.status === "processing"
+                      ? "Processing"
+                      : "Awaiting Payment"}
+                  </p>
+                </div>
+              ) : booking.quote_status === "quote_approved" &&
+                booking.status === "in_progress" ? (
+                <div className="card">
+                  <strong>Payment Confirmed — Job In Progress</strong>
+
+                  <p>
+                    Service Price: R{booking.quote_service_price ?? 0}
+                  </p>
+
+                  <p>
+                    Call-out Fee: R{booking.quote_callout_fee ?? 0}
+                  </p>
+
+                  <p>
+                    Total: R{booking.quote_total ?? 0}
+                  </p>
+
+                  {booking.quote_estimated_time ? (
+                    <p>
+                      Estimated Time: {booking.quote_estimated_time}
+                    </p>
+                  ) : null}
+
+                  {booking.quote_warranty ? (
+                    <p>
+                      Warranty: {booking.quote_warranty}
+                    </p>
+                  ) : null}
+
+                  <p>
+                    PayFast has confirmed payment. The job can now proceed.
                   </p>
                 </div>
               ) : booking.status === "confirmed" ? (
@@ -992,7 +1140,29 @@ const averageRating =
 
                {booking.status === "pending" ? (
               <div className="inline-actions">
-                <form action={updateBookingStatusAction}>
+                <form
+                  action={(formData) => {
+                    startTransition(async () => {
+                      try {
+                        const result = await updateBookingStatusAction(formData);
+                        if (!result?.success) {
+                          setError(result?.message ?? "Booking could not be accepted.");
+                          setFeedback(null);
+                        } else {
+                          setError(null);
+                          setFeedback(result.message);
+                        }
+                        await loadDashboard();
+                      } catch (actionError) {
+                        setError(
+                          actionError instanceof Error
+                            ? actionError.message
+                            : "Booking could not be updated. Please try again."
+                        );
+                      }
+                    });
+                  }}
+                >
                   <input
                     type="hidden"
                     name="bookingId"
@@ -1006,12 +1176,35 @@ const averageRating =
                   <button
                     className="button-primary"
                     type="submit"
+                    disabled={isPending}
                   >
-                    Accept booking
+                    {isPending ? "Processing..." : "Accept booking"}
                   </button>
                 </form>
 
-                <form action={updateBookingStatusAction}>
+                <form
+                  action={(formData) => {
+                    startTransition(async () => {
+                      try {
+                        const result = await updateBookingStatusAction(formData);
+                        if (!result?.success) {
+                          setError(result?.message ?? "Booking could not be rejected.");
+                          setFeedback(null);
+                        } else {
+                          setError(null);
+                          setFeedback(result.message);
+                        }
+                        await loadDashboard();
+                      } catch (actionError) {
+                        setError(
+                          actionError instanceof Error
+                            ? actionError.message
+                            : "Booking could not be updated. Please try again."
+                        );
+                      }
+                    });
+                  }}
+                >
                   <input
                     type="hidden"
                     name="bookingId"
@@ -1025,8 +1218,9 @@ const averageRating =
                   <button
                     className="button-secondary"
                     type="submit"
+                    disabled={isPending}
                   >
-                    Reject booking
+                    {isPending ? "Processing..." : "Reject booking"}
                   </button>
                 </form>
               </div>

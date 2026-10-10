@@ -3,6 +3,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getPayfastConfig } from "./config";
 import { generatePayfastSignature } from "./signature";
+import { getPlatformSettings } from "@/lib/platform-settings";
 
 export type PayfastCheckout = {
   action: string;
@@ -103,12 +104,34 @@ if (
 
   const config = getPayfastConfig();
 
-  const appBaseUrl =
+  // Vercel preview deployments must return to their own hostname so
+  // the customer's preview-domain auth cookies remain available.
+  // Production continues to use the stable canonical APP_BASE_URL.
+  const isPreviewDeployment =
+    process.env.VERCEL_ENV === "preview";
+
+  const previewHost = process.env.VERCEL_URL?.trim();
+  const configuredBaseUrl =
     process.env.APP_BASE_URL?.replace(/\/$/, "");
+
+  const appBaseUrl = isPreviewDeployment && previewHost
+    ? `https://${previewHost.replace(/^https?:\/\//, "").replace(/\/$/, "")}`
+    : configuredBaseUrl;
 
   if (!appBaseUrl) {
     throw new Error(
-      "Missing required environment variable: APP_BASE_URL"
+      isPreviewDeployment
+        ? "Missing VERCEL_URL for the preview return URL."
+        : "Missing required environment variable: APP_BASE_URL"
+    );
+  }
+
+  const notifyUrl =
+    process.env.PAYFAST_NOTIFY_URL?.replace(/\/$/, "");
+
+  if (!notifyUrl) {
+    throw new Error(
+      "Missing required environment variable: PAYFAST_NOTIFY_URL"
     );
   }
 
@@ -120,9 +143,9 @@ if (
     merchant_id: config.merchantId,
     merchant_key: config.merchantKey,
 
-    return_url: `${appBaseUrl}/customer?payment=success`,
-    cancel_url: `${appBaseUrl}/customer?payment=cancelled`,
-    notify_url: `${appBaseUrl}/api/payfast/notify`,
+    return_url: `${appBaseUrl}/customer?payment=success&booking=${payment.booking_id}`,
+    cancel_url: `${appBaseUrl}/customer?payment=cancelled&booking=${payment.booking_id}`,
+    notify_url: notifyUrl,
 
     name_first: customer.full_name.trim().split(/\s+/)[0],
     name_last: customer.full_name.trim().split(/\s+/).slice(1).join(" "),
@@ -136,10 +159,28 @@ if (
       "Automotive service booking"
   };
 
-  const setup = JSON.stringify({
+  const platformSettings = await getPlatformSettings();
+const platformFeePercent =
+  platformSettings.payments.platform_fee_percent;
+
+const providerPercentage = Number(
+  (100 - platformFeePercent).toFixed(2)
+);
+
+if (
+  !Number.isFinite(providerPercentage) ||
+  providerPercentage < 0 ||
+  providerPercentage > 100
+) {
+  throw new Error(
+    "Invalid platform fee configuration."
+  );
+}
+
+const setup = JSON.stringify({
   split_payment: {
     merchant_id: payfastMerchantId,
-    percentage: 85
+    percentage: providerPercentage
   }
 });
 
