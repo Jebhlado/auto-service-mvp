@@ -630,6 +630,10 @@ const averageRating =
         </div>
       ) : null}
 
+      <div className="inline-actions">
+        <Link href="/provider/earnings" className="button-secondary">View earnings &amp; payments</Link>
+      </div>
+
       <div className="card-grid">
   <div className="card">
     <strong>{state.totalBookings}</strong>
