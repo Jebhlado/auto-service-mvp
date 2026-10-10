@@ -187,73 +187,62 @@ export async function updateBookingStatusAction(
 ) {
   const { user } = await requireRole(["provider"]);
 
-  const bookingId = String(
-    formData.get("bookingId") ?? ""
-  );
-
-  const status = String(
-    formData.get("status") ?? ""
-  );
+  const bookingId = String(formData.get("bookingId") ?? "").trim();
+  const status = String(formData.get("status") ?? "");
 
   if (!bookingId) {
-    throw new Error("Booking ID is required.");
+    return { success: false, message: "Booking ID is required." };
   }
 
-  if (
-    status !== "confirmed" &&
-    status !== "rejected"
-  ) {
-    throw new Error("Invalid booking status.");
+  if (status !== "confirmed" && status !== "rejected") {
+    return { success: false, message: "Invalid booking status." };
   }
 
   const supabase = await createClient();
 
-  const { data: booking, error: bookingError } =
-    await supabase
-      .from("bookings")
-      .select("id, provider_id, customer_id, status")
-      .eq("id", bookingId)
-      .eq("provider_id", user.id)
-      .single();
-
-  if (bookingError || !booking) {
-    throw new Error(
-      "Booking not found or access denied."
-    );
-  }
-
-  if (booking.status !== "pending") {
-    throw new Error(
-      "Only pending bookings can be accepted or rejected."
-    );
-  }
-
-  const { error } = await supabase
+  // Update only a pending booking. This makes the operation safe when a stale
+  // dashboard submits the same action twice or two requests race each other.
+  const { data: updatedBooking, error: updateError } = await supabase
     .from("bookings")
-    .update({
-      status,
-    })
+    .update({ status })
     .eq("id", bookingId)
     .eq("provider_id", user.id)
-    .eq("status", "pending");
+    .eq("status", "pending")
+    .select("id, customer_id")
+    .maybeSingle();
 
-  if (error) {
-    throw new Error(error.message);
+  if (updateError) {
+    console.error("Booking status update failed:", updateError.message);
+    return {
+      success: false,
+      message: "We couldn't update this booking. Please refresh the dashboard and try again."
+    };
+  }
+
+  if (!updatedBooking) {
+    // No row was changed: the booking may already have been handled, removed,
+    // or may not belong to this provider. Do not throw a server exception.
+    return {
+      success: false,
+      message: "This booking has already been handled or is no longer available. Refresh the dashboard to see its latest status."
+    };
   }
 
   const { data: customer } = await supabase
     .from("profiles")
     .select("email")
-    .eq("id", booking.customer_id)
+    .eq("id", updatedBooking.customer_id)
     .maybeSingle();
 
-  const notificationTitle = status === "confirmed" ? "Booking accepted" : "Booking declined";
-  const notificationMessage = status === "confirmed"
-    ? "Your provider accepted the booking request."
-    : "Your provider declined the booking request.";
+  const notificationTitle =
+    status === "confirmed" ? "Booking accepted" : "Booking declined";
+  const notificationMessage =
+    status === "confirmed"
+      ? "Your provider accepted the booking request."
+      : "Your provider declined the booking request.";
 
   await createNotification(
-    booking.customer_id,
+    updatedBooking.customer_id,
     notificationTitle,
     notificationMessage,
     "booking_updates"
@@ -262,14 +251,23 @@ export async function updateBookingStatusAction(
   if (customer?.email) {
     await sendNotification({
       to: customer.email,
-      subject: status === "confirmed" ? "Your booking was accepted" : "Your booking was declined",
+      subject:
+        status === "confirmed"
+          ? "Your booking was accepted"
+          : "Your booking was declined",
       html: `<p>${notificationMessage}</p>`,
       text: notificationMessage
     }, "booking_updates");
   }
 
+  revalidatePath("/provider");
   revalidatePath("/dashboard/provider");
   revalidatePath("/customer");
+
+  return {
+    success: true,
+    message: status === "confirmed" ? "Booking accepted successfully." : "Booking declined successfully."
+  };
 }
 
 export async function sendQuoteAction(formData: FormData) {
