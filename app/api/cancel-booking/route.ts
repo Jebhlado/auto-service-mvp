@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 
   const { data: updatedBooking, error } = await supabase
     .from("bookings")
-    .update({ status: "rejected" })
+    .update({ status: "cancelled" })
     .eq("id", bookingId)
     .eq("customer_id", user.id)
     .in("status", ["pending", "confirmed"])
