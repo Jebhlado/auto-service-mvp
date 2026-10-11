@@ -223,7 +223,12 @@ customerBookings = bookingsWithAttachments;
         </div>
       </div>
 
-      {params.success ? (
+      {params.success === "booking-cancelled" ? (
+        <div className="card" role="status" style={{ marginBottom: "1rem" }}>
+          <strong>Booking cancelled</strong>
+          <p className="muted">Your cancellation has been recorded and the provider has been notified.</p>
+        </div>
+      ) : params.success ? (
         <div className="card" style={{ marginBottom: "1rem" }}>
           <strong>Booking request sent</strong>
           <p className="muted">Your appointment was created with a pending status and is waiting for provider review.</p>
@@ -637,6 +642,15 @@ customerBookings = bookingsWithAttachments;
   >
     View Attachment
   </a>
+) : null}
+
+{["pending", "confirmed"].includes(booking.status) ? (
+  <form action="/api/cancel-booking" method="POST">
+    <input type="hidden" name="bookingId" value={booking.id} />
+    <button type="submit" className="button-secondary">
+      Cancel Booking
+    </button>
+  </form>
 ) : null}
       </article>
     ))
