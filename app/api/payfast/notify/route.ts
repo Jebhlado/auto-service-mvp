@@ -447,10 +447,19 @@ export async function POST(
         );
       }
 
-      return new NextResponse(
-        "OK",
-        { status: 200 }
-      );
+      // Retry any unfinished post-payment work even when the payment is already paid.
+      const { processPaymentOutbox } = await import("@/lib/payment-outbox");
+      try {
+        await processPaymentOutbox(payment.id);
+      } catch (outboxError) {
+        console.error("Duplicate ITN could not finish payment outbox work", {
+          paymentId: payment.id,
+          error: outboxError,
+        });
+        return new NextResponse("Payment confirmed; follow-up processing will retry", { status: 500 });
+      }
+
+      return new NextResponse("OK", { status: 200 });
     }
 
     /*
@@ -633,163 +642,27 @@ export async function POST(
     }
 
     /*
-     * ---------------------------------------------------------
-     * 13. Payment is now confirmed.
-     * Respect the platform's payment notification preferences.
-     * ---------------------------------------------------------
+     * The database trigger creates a durable outbox item in the same
+     * transaction that changes payment status to paid.
      */
-
-    await createNotification(
-      payment.customer_id,
-      "Payment confirmed",
-      `Your payment of R${amountGross.toFixed(2)} has been confirmed.`,
-      "payment_updates",
-      `payment-confirmed:${payment.id}:customer`
-    );
-
-    const { data: customerProfile } = await supabase
-      .from("profiles")
-      .select("email")
-      .eq("id", payment.customer_id)
-      .maybeSingle();
-
-    if (customerProfile?.email) {
-      await sendNotification({
-        to: customerProfile.email,
-        subject: "Mechanic Connect payment confirmed",
-        html: `<p>Your payment of R${amountGross.toFixed(2)} has been confirmed. You can view the latest booking status from your customer dashboard.</p>`,
-        text: `Your payment of R${amountGross.toFixed(2)} has been confirmed. You can view the latest booking status from your customer dashboard.`
-      }, "payment_updates");
+    const { processPaymentOutbox } = await import("@/lib/payment-outbox");
+    try {
+      await processPaymentOutbox(payment.id);
+    } catch (outboxError) {
+      console.error("Payment is confirmed but outbox processing needs retry", {
+        paymentId: payment.id,
+        error: outboxError,
+      });
+      return new NextResponse("Payment confirmed; follow-up processing will retry", { status: 500 });
     }
 
-    /*
-     * ---------------------------------------------------------
-     * 14. Move the booking to in_progress only after payment.
-     * ---------------------------------------------------------
-     */
-
-    const {
-      data: booking,
-      error: bookingError
-    } = await supabase
-      .from("bookings")
-      .select(
-        "id, status"
-      )
-      .eq(
-        "id",
-        payment.booking_id
-      )
-      .single();
-
-    if (
-      bookingError ||
-      !booking
-    ) {
-      console.error(
-        "Payment is paid but booking could not be loaded",
-        {
-          bookingId:
-            payment.booking_id,
-          bookingError
-        }
-      );
-
-      /*
-       * Payment is already confirmed.
-       * Do not return a fake payment failure.
-       * The booking can be reconciled separately.
-       */
-      return new NextResponse(
-        "OK",
-        { status: 200 }
-      );
-    }
-
-    if (
-      booking.status === "confirmed"
-    ) {
-      const {
-        error: bookingUpdateError
-      } = await supabase
-        .from("bookings")
-        .update({
-          status: "in_progress"
-        })
-        .eq(
-          "id",
-          booking.id
-        )
-        .eq(
-          "status",
-          "confirmed"
-        );
-
-      if (bookingUpdateError) {
-        console.error(
-          "Payment confirmed but booking could not be started",
-          bookingUpdateError
-        );
-
-        return new NextResponse(
-          "OK",
-          { status: 200 }
-        );
-      }
-    }
-
-    /*
-     * ---------------------------------------------------------
-     * 14. Notify the provider after payment is confirmed.
-     * The payment is not considered successful until PayFast's
-     * ITN validation and payment-state transition above succeed.
-     * ---------------------------------------------------------
-     */
-    await createNotification(
-      payment.provider_id,
-      "Payment received",
-      `The customer's payment of R${amountGross.toFixed(2)} has been confirmed. The booking is now ready to proceed.`,
-      "payment_updates",
-      `payment-confirmed:${payment.id}:provider`
-    );
-
-    const { data: providerProfile } = await supabase
-      .from("provider_profiles")
-      .select("contact_email")
-      .eq("user_id", payment.provider_id)
-      .maybeSingle();
-
-    if (providerProfile?.contact_email) {
-      await sendNotification({
-        to: providerProfile.contact_email,
-        subject: "Customer payment confirmed",
-        html: `<p>The customer's payment of R${amountGross.toFixed(2)} has been confirmed. Sign in to AutoCare Connect to view the booking and continue the job.</p>`,
-        text: `The customer's payment of R${amountGross.toFixed(2)} has been confirmed. Sign in to AutoCare Connect to view the booking and continue the job.`
-      }, "payment_updates");
-    }
-
-    /*
-     * ---------------------------------------------------------
-     * 15. ITN successfully processed
-     * ---------------------------------------------------------
-     */
-
-    console.log(
-      "PayFast ITN processed successfully",
-      {
-        paymentId:
-          payment.id,
-        bookingId:
-          payment.booking_id,
-        payfastPaymentId,
-        amountGross
-      }
-    );
-
-    return new NextResponse(
-      "OK",
-      { status: 200 }
-    );
+    console.log("PayFast ITN processed successfully", {
+      paymentId: payment.id,
+      bookingId: payment.booking_id,
+      payfastPaymentId,
+      amountGross,
+    });
+    return new NextResponse("OK", { status: 200 });
   } catch (error) {
     console.error(
       "PayFast ITN processing error",
