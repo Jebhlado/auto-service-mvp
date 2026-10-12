@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { sendNotification } from "@/lib/notifications";
+import { escapeNotificationHtml, sendNotification } from "@/lib/notifications";
 import { createNotification } from "@/lib/create-notification";
 import { getPlatformSettings } from "@/lib/platform-settings";
 import { createAdminClient } from "@/lib/supabase/admin";
