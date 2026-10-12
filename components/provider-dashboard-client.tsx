@@ -187,14 +187,6 @@ setPayfastMerchantId(
   .eq("user_id", user.id)
   .order("created_at", { ascending: false });
 
-  if (markNotificationsRead && notifications?.length) {
-  await supabase
-    .from("notifications")
-    .update({ is_read: true })
-    .eq("user_id", user.id)
-    .eq("is_read", false);
-}
-
   const customerIds =
   bookings?.map((booking) => booking.customer_id) ?? [];
 
