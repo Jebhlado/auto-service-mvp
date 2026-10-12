@@ -175,8 +175,8 @@ export async function createBookingAction(formData: FormData) {
       to: provider.contact_email,
       subject: "New booking request",
       html: `
-        <p>${profile.full_name} requested an appointment for ${appointmentDate}.</p>
-        <p>${issueDescription}</p>
+        <p>${escapeNotificationHtml(profile.full_name || "A customer")} requested an appointment for ${escapeNotificationHtml(appointmentDate)}.</p>
+        <p>${escapeNotificationHtml(issueDescription)}</p>
       `,
       text: `${profile.full_name} requested an appointment for ${appointmentDate}. ${issueDescription}`
     }, "booking_updates");
