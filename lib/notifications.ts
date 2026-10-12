@@ -19,6 +19,7 @@ type NotificationPayload = {
 export async function sendNotification(
   payload: NotificationPayload,
   category?: NotificationCategory,
+  idempotencyKey?: string,
 ) {
   const settings = await getPlatformSettings();
   if (!settings.notifications.email_enabled || (category && !settings.notifications[category])) {
@@ -37,7 +38,8 @@ export async function sendNotification(
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
     },
     body: JSON.stringify({
       from,
