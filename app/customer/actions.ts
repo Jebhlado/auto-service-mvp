@@ -82,7 +82,8 @@ export async function updateQuoteStatus(
       booking.provider_id,
       "Quote declined",
       "The customer declined your quote. Review the booking before taking further action.",
-      "quote_updates"
+      "quote_updates",
+      `quote-declined:${bookingId}:provider`
     );
 
     const { data: provider } = await supabase
@@ -127,7 +128,8 @@ export async function updateQuoteStatus(
     booking.provider_id,
     "Quote approved",
     "The customer approved your quote. Payment is now required before work can begin.",
-    "quote_updates"
+    "quote_updates",
+    `quote-approved:${bookingId}:provider`
   );
 
   const { data: provider } = await supabase
@@ -149,7 +151,8 @@ export async function updateQuoteStatus(
     user.id,
     "Payment required",
     "Your quote was approved. Complete payment to allow the provider to begin work.",
-    "payment_updates"
+    "payment_updates",
+    `payment-required:${bookingId}:customer`
   );
 
   const { data: customerProfile } = await supabase
@@ -249,7 +252,8 @@ export async function confirmCompletedJob(
     booking.provider_id,
     "Job completion confirmed",
     "The customer confirmed that the job is complete.",
-    "completion_updates"
+    "completion_updates",
+    `completion-confirmed:${bookingId}:provider`
   );
 
   const { data: provider } = await supabase
@@ -361,7 +365,8 @@ export async function createReview(
     booking.provider_id,
     "New customer review",
     reviewSummary,
-    "booking_updates"
+    "booking_updates",
+    `review-created:${bookingId}:provider`
   );
 
   const { data: providerProfile } = await supabase
