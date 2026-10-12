@@ -20,7 +20,8 @@ to authenticated
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
-revoke all on table public.notifications from anon;
+-- Start from no table-level privileges, then grant only the operations needed.
+-- Column-level UPDATE prevents users from changing title, message, user_id, etc.
+revoke all on table public.notifications from public, anon, authenticated;
 grant select on table public.notifications to authenticated;
-revoke update on table public.notifications from authenticated;
 grant update (is_read) on table public.notifications to authenticated;
