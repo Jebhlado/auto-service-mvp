@@ -835,9 +835,16 @@ const averageRating =
         </p>
 
         {!notification.is_read && (
-          <span className="status-chip status-pending">
-            Unread
-          </span>
+          <div className="stack-sm">
+            <span className="status-chip status-pending">Unread</span>
+            <button
+              type="button"
+              className="button-secondary"
+              onClick={() => void markNotificationRead(notification.id)}
+            >
+              Mark as read
+            </button>
+          </div>
         )}
       </div>
     ))
