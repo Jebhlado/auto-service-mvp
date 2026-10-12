@@ -353,7 +353,7 @@ const averageRating =
           () => {
             if (active && !refreshInFlight) {
               refreshInFlight = true;
-              void loadDashboard(false).finally(() => {
+              void loadDashboard().finally(() => {
                 refreshInFlight = false;
               });
             }
@@ -370,7 +370,7 @@ const averageRating =
           () => {
             if (active && !refreshInFlight) {
               refreshInFlight = true;
-              void loadDashboard(false).finally(() => {
+              void loadDashboard().finally(() => {
                 refreshInFlight = false;
               });
             }
@@ -388,7 +388,7 @@ const averageRating =
       refreshInterval = setInterval(() => {
         if (active && !refreshInFlight) {
           refreshInFlight = true;
-          void loadDashboard(false).finally(() => {
+          void loadDashboard().finally(() => {
             refreshInFlight = false;
           });
         }
