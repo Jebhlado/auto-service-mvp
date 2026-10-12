@@ -344,7 +344,8 @@ export async function createReview(
   await createNotification(
     booking.provider_id,
     "New customer review",
-    reviewSummary
+    reviewSummary,
+    "booking_updates"
   );
 
   const { data: providerProfile } = await supabase
@@ -370,7 +371,7 @@ export async function createReview(
       subject: `You received a ${rating}-star customer review`,
       html: `<p>A customer reviewed a completed booking.</p><p><strong>Rating:</strong> ${rating}/5 stars</p>${escapedReview ? `<p><strong>Review:</strong> ${escapedReview}</p>` : "<p>The customer left a rating without written feedback.</p>"}`,
       text: reviewMessage
-    });
+    }, "booking_updates");
   }
 
   revalidatePath("/customer");
