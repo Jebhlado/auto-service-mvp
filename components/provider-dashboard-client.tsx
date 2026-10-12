@@ -100,7 +100,7 @@ export function ProviderDashboardClient({ serviceCategories }: { serviceCategori
   const onboarding = searchParams.get("onboarding") === "1";
   
 
-  async function loadDashboard(markNotificationsRead = true) {
+  async function loadDashboard(markNotificationsRead = false) {
   const supabase = createClient();
 
   const {
