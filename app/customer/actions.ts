@@ -57,17 +57,25 @@ export async function updateQuoteStatus(
   }
 
   if (decision === "reject") {
-    const { error } = await supabase
+    const { data: rejectedBooking, error } = await supabase
       .from("bookings")
       .update({
         quote_status: "quote_rejected"
       })
       .eq("id", bookingId)
       .eq("customer_id", user.id)
-      .eq("quote_status", "quote_sent");
+      .eq("quote_status", "quote_sent")
+      .select("id")
+      .maybeSingle();
 
     if (error) {
       throw new Error(error.message);
+    }
+
+    if (!rejectedBooking) {
+      throw new Error(
+        "This quote has already been handled. Refresh the page to see its latest status."
+      );
     }
 
     await createNotification(
@@ -214,7 +222,7 @@ export async function confirmCompletedJob(
     );
   }
 
-  const { error } = await supabase
+  const { data: closedBooking, error } = await supabase
     .from("bookings")
     .update({
       status: "closed",
@@ -223,10 +231,18 @@ export async function confirmCompletedJob(
     })
     .eq("id", bookingId)
     .eq("customer_id", user.id)
-    .eq("status", "completed");
+    .eq("status", "completed")
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  if (!closedBooking) {
+    throw new Error(
+      "This booking has already been confirmed or is no longer ready to close. Refresh the page to see its latest status."
+    );
   }
 
   await createNotification(
