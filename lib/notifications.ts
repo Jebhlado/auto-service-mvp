@@ -1,5 +1,14 @@
 import { getPlatformSettings, type NotificationCategory } from "@/lib/platform-settings";
 
+export function escapeNotificationHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 type NotificationPayload = {
   to: string;
   subject: string;
