@@ -412,14 +412,16 @@ const averageRating =
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { error } = await supabase
+    const { data: updatedNotification, error } = await supabase
       .from("notifications")
       .update({ is_read: true })
       .eq("id", notificationId)
       .eq("user_id", user.id)
-      .eq("is_read", false);
+      .eq("is_read", false)
+      .select("id")
+      .maybeSingle();
 
-    if (error) {
+    if (error || !updatedNotification) {
       setError("Notification could not be marked as read. Please try again.");
       return;
     }
