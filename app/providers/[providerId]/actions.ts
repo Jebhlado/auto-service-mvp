@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { sendNotification } from "@/lib/notifications";
+import { escapeNotificationHtml, sendNotification } from "@/lib/notifications";
 import { createNotification } from "@/lib/create-notification";
 
 export async function createBookingAction(formData: FormData) {
