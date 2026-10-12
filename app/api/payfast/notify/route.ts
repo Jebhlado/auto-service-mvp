@@ -643,7 +643,8 @@ export async function POST(
       payment.customer_id,
       "Payment confirmed",
       `Your payment of R${amountGross.toFixed(2)} has been confirmed.`,
-      "payment_updates"
+      "payment_updates",
+      `payment-confirmed:${payment.id}:customer`
     );
 
     const { data: customerProfile } = await supabase
@@ -748,7 +749,8 @@ export async function POST(
       payment.provider_id,
       "Payment received",
       `The customer's payment of R${amountGross.toFixed(2)} has been confirmed. The booking is now ready to proceed.`,
-      "payment_updates"
+      "payment_updates",
+      `payment-confirmed:${payment.id}:provider`
     );
 
     const { data: providerProfile } = await supabase
