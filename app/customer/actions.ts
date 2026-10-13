@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { approveQuoteAndCreatePayment } from "@/lib/payments";
 import { createPayfastCheckout } from "@/lib/payfast/checkout";
+import { sendNotification } from "@/lib/notifications";
+import { createNotification } from "@/lib/create-notification";
 
 export async function updateQuoteStatus(
   formData: FormData
@@ -55,17 +57,48 @@ export async function updateQuoteStatus(
   }
 
   if (decision === "reject") {
-    const { error } = await supabase
+    const { data: rejectedBooking, error } = await supabase
       .from("bookings")
       .update({
         quote_status: "quote_rejected"
       })
       .eq("id", bookingId)
       .eq("customer_id", user.id)
-      .eq("quote_status", "quote_sent");
+      .eq("quote_status", "quote_sent")
+      .select("id")
+      .maybeSingle();
 
     if (error) {
       throw new Error(error.message);
+    }
+
+    if (!rejectedBooking) {
+      throw new Error(
+        "This quote has already been handled. Refresh the page to see its latest status."
+      );
+    }
+
+    await createNotification(
+      booking.provider_id,
+      "Quote declined",
+      "The customer declined your quote. Review the booking before taking further action.",
+      "quote_updates",
+      `quote-declined:${bookingId}:provider`
+    );
+
+    const { data: provider } = await supabase
+      .from("provider_profiles")
+      .select("contact_email")
+      .eq("user_id", booking.provider_id)
+      .maybeSingle();
+
+    if (provider?.contact_email) {
+      await sendNotification({
+        to: provider.contact_email,
+        subject: "Customer declined your quote",
+        html: "<p>The customer has declined your quote. Sign in to review the booking.</p>",
+        text: "The customer has declined your quote. Sign in to review the booking."
+      }, "quote_updates");
     }
 
     revalidatePath("/customer");
@@ -90,6 +123,52 @@ export async function updateQuoteStatus(
   }
 
   await approveQuoteAndCreatePayment(bookingId);
+
+  await createNotification(
+    booking.provider_id,
+    "Quote approved",
+    "The customer approved your quote. Payment is now required before work can begin.",
+    "quote_updates",
+    `quote-approved:${bookingId}:provider`
+  );
+
+  const { data: provider } = await supabase
+    .from("provider_profiles")
+    .select("contact_email")
+    .eq("user_id", booking.provider_id)
+    .maybeSingle();
+
+  if (provider?.contact_email) {
+    await sendNotification({
+      to: provider.contact_email,
+      subject: "Your quote was approved",
+      html: "<p>The customer approved your quote. Payment is now required before work can begin.</p>",
+      text: "The customer approved your quote. Payment is now required before work can begin."
+    }, "quote_updates");
+  }
+
+  await createNotification(
+    user.id,
+    "Payment required",
+    "Your quote was approved. Complete payment to allow the provider to begin work.",
+    "payment_updates",
+    `payment-required:${bookingId}:customer`
+  );
+
+  const { data: customerProfile } = await supabase
+    .from("profiles")
+    .select("email")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (customerProfile?.email) {
+    await sendNotification({
+      to: customerProfile.email,
+      subject: "Payment required for your approved quote",
+      html: "<p>Your quote was approved. Complete payment from your customer dashboard to allow the provider to begin work.</p>",
+      text: "Your quote was approved. Complete payment from your customer dashboard to allow the provider to begin work."
+    }, "payment_updates");
+  }
 
   revalidatePath("/customer");
   revalidatePath("/provider");
@@ -129,7 +208,7 @@ export async function confirmCompletedJob(
   const { data: booking, error: bookingError } =
     await supabase
       .from("bookings")
-      .select("id, customer_id, status")
+      .select("id, customer_id, provider_id, status")
       .eq("id", bookingId)
       .eq("customer_id", user.id)
       .single();
@@ -146,7 +225,7 @@ export async function confirmCompletedJob(
     );
   }
 
-  const { error } = await supabase
+  const { data: closedBooking, error } = await supabase
     .from("bookings")
     .update({
       status: "closed",
@@ -155,10 +234,41 @@ export async function confirmCompletedJob(
     })
     .eq("id", bookingId)
     .eq("customer_id", user.id)
-    .eq("status", "completed");
+    .eq("status", "completed")
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  if (!closedBooking) {
+    throw new Error(
+      "This booking has already been confirmed or is no longer ready to close. Refresh the page to see its latest status."
+    );
+  }
+
+  await createNotification(
+    booking.provider_id,
+    "Job completion confirmed",
+    "The customer confirmed that the job is complete.",
+    "completion_updates",
+    `completion-confirmed:${bookingId}:provider`
+  );
+
+  const { data: provider } = await supabase
+    .from("provider_profiles")
+    .select("contact_email")
+    .eq("user_id", booking.provider_id)
+    .maybeSingle();
+
+  if (provider?.contact_email) {
+    await sendNotification({
+      to: provider.contact_email,
+      subject: "Customer confirmed job completion",
+      html: "<p>The customer confirmed that the job is complete.</p>",
+      text: "The customer confirmed that the job is complete."
+    }, "completion_updates");
   }
 
   revalidatePath("/customer");
@@ -245,6 +355,44 @@ export async function createReview(
 
   if (error) {
     throw new Error(error.message);
+  }
+
+  const reviewSummary = reviewText
+    ? `A customer gave you ${rating}/5 stars: ${reviewText}`
+    : `A customer gave your service ${rating}/5 stars.`;
+
+  await createNotification(
+    booking.provider_id,
+    "New customer review",
+    reviewSummary,
+    "booking_updates",
+    `review-created:${bookingId}:provider`
+  );
+
+  const { data: providerProfile } = await supabase
+    .from("provider_profiles")
+    .select("contact_email")
+    .eq("user_id", booking.provider_id)
+    .maybeSingle();
+
+  if (providerProfile?.contact_email) {
+    const escapedReview = reviewText
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+
+    const reviewMessage = reviewText
+      ? `The customer rated your service ${rating}/5 stars and wrote: "${reviewText}"`
+      : `The customer rated your service ${rating}/5 stars.`;
+
+    await sendNotification({
+      to: providerProfile.contact_email,
+      subject: `You received a ${rating}-star customer review`,
+      html: `<p>A customer reviewed a completed booking.</p><p><strong>Rating:</strong> ${rating}/5 stars</p>${escapedReview ? `<p><strong>Review:</strong> ${escapedReview}</p>` : "<p>The customer left a rating without written feedback.</p>"}`,
+      text: reviewMessage
+    }, "booking_updates");
   }
 
   revalidatePath("/customer");

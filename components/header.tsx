@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { HeaderAuth } from "@/components/header-auth";
+import { getPlatformSettings } from "@/lib/platform-settings";
 
 export async function Header() {
+  const settings = await getPlatformSettings();
   return (
     <header className="site-header">
       <Link href="/" className="brand">
-        AutoCare Connect
+        {settings.general.platform_name}
       </Link>
 
       <nav className="nav-links">

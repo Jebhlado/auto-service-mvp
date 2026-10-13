@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { sendNotification } from "@/lib/notifications";
+import { escapeNotificationHtml, sendNotification } from "@/lib/notifications";
 import { createNotification } from "@/lib/create-notification";
 
 export async function createBookingAction(formData: FormData) {
@@ -91,7 +91,8 @@ export async function createBookingAction(formData: FormData) {
   await createNotification(
     providerId,
     "New Booking",
-    `${profile.full_name} submitted a new booking request.`
+    `${profile.full_name} submitted a new booking request.`,
+    "booking_updates"
   );
 
   const { data: provider } = await supabase
@@ -105,11 +106,11 @@ export async function createBookingAction(formData: FormData) {
       to: provider.contact_email,
       subject: "New booking request",
       html: `
-        <p>${profile.full_name} requested an appointment for ${appointmentDate}.</p>
-        <p>${issueDescription}</p>
+        <p>${escapeNotificationHtml(profile.full_name || "A customer")} requested an appointment for ${escapeNotificationHtml(appointmentDate)}.</p>
+        <p>${escapeNotificationHtml(issueDescription)}</p>
       `,
       text: `${profile.full_name} requested an appointment for ${appointmentDate}. ${issueDescription}`
-    });
+    }, "booking_updates");
   }
 
   redirect("/customer?success=booking-created");

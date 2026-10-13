@@ -1,3 +1,14 @@
+import { getPlatformSettings, type NotificationCategory } from "@/lib/platform-settings";
+
+export function escapeNotificationHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 type NotificationPayload = {
   to: string;
   subject: string;
@@ -5,12 +16,21 @@ type NotificationPayload = {
   text: string;
 };
 
-export async function sendNotification(payload: NotificationPayload) {
+export async function sendNotification(
+  payload: NotificationPayload,
+  category?: NotificationCategory,
+  idempotencyKey?: string,
+) {
+  const settings = await getPlatformSettings();
+  if (!settings.notifications.email_enabled || (category && !settings.notifications[category])) {
+    return { sent: false, skipped: true };
+  }
+
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.NOTIFICATION_FROM_EMAIL;
 
   if (!apiKey || !from) {
-    console.info("Notification skipped. Configure RESEND_API_KEY and NOTIFICATION_FROM_EMAIL.", payload);
+    console.info("Notification skipped. Configure RESEND_API_KEY and NOTIFICATION_FROM_EMAIL.");
     return { sent: false };
   }
 
@@ -18,7 +38,8 @@ export async function sendNotification(payload: NotificationPayload) {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
     },
     body: JSON.stringify({
       from,

@@ -1,10 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
 import { sendNotification } from "@/lib/notifications";
+import { createNotification } from "@/lib/create-notification";
 import { redirect } from "next/navigation";
+import { getPlatformSettings } from "@/lib/platform-settings";
 
 export async function POST(request: Request) {
   const formData = await request.formData();
   const bookingId = String(formData.get("bookingId") ?? "");
+
+  const settings = await getPlatformSettings();
+  if (!settings.booking_rules.customer_cancellation_enabled) {
+    redirect("/customer?error=customer-cancellation-disabled");
+  }
 
   const supabase = await createClient();
 
@@ -21,6 +28,7 @@ export async function POST(request: Request) {
     .select(`
       id,
       customer_id,
+      provider_id,
       status,
       provider:provider_profiles (
         contact_email,
@@ -38,7 +46,7 @@ export async function POST(request: Request) {
 
   const { data: updatedBooking, error } = await supabase
     .from("bookings")
-    .update({ status: "rejected" })
+    .update({ status: "cancelled" })
     .eq("id", bookingId)
     .eq("customer_id", user.id)
     .in("status", ["pending", "confirmed"])
@@ -57,13 +65,20 @@ export async function POST(request: Request) {
     ? booking.provider[0]
     : booking.provider;
 
+  await createNotification(
+    booking.provider_id,
+    "Booking cancelled",
+    "A customer cancelled their appointment. Review the booking in your dashboard.",
+    "booking_updates"
+  );
+
   if (provider?.contact_email) {
     await sendNotification({
       to: provider.contact_email,
       subject: "Booking cancelled",
       html: `<p>A customer has cancelled their appointment.</p>`,
       text: "A customer cancelled their appointment."
-    });
+    }, "booking_updates");
   }
 
   redirect("/customer?success=booking-cancelled");

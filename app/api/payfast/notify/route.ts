@@ -1,6 +1,8 @@
 import "server-only";
 
 import { NextRequest, NextResponse } from "next/server";
+import { sendNotification } from "@/lib/notifications";
+import { createNotification } from "@/lib/create-notification";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPayfastConfig } from "@/lib/payfast/config";
 import {
@@ -445,10 +447,19 @@ export async function POST(
         );
       }
 
-      return new NextResponse(
-        "OK",
-        { status: 200 }
-      );
+      // Retry any unfinished post-payment work even when the payment is already paid.
+      const { processPaymentOutbox } = await import("@/lib/payment-outbox");
+      try {
+        await processPaymentOutbox(payment.id);
+      } catch (outboxError) {
+        console.error("Duplicate ITN could not finish payment outbox work", {
+          paymentId: payment.id,
+          error: outboxError,
+        });
+        return new NextResponse("Payment confirmed; follow-up processing will retry", { status: 500 });
+      }
+
+      return new NextResponse("OK", { status: 200 });
     }
 
     /*
@@ -631,106 +642,27 @@ export async function POST(
     }
 
     /*
-     * ---------------------------------------------------------
-     * 13. Payment is now confirmed.
-     *
-     * Only NOW do we move the booking from confirmed
-     * to in_progress.
-     * ---------------------------------------------------------
+     * The database trigger creates a durable outbox item in the same
+     * transaction that changes payment status to paid.
      */
-
-    const {
-      data: booking,
-      error: bookingError
-    } = await supabase
-      .from("bookings")
-      .select(
-        "id, status"
-      )
-      .eq(
-        "id",
-        payment.booking_id
-      )
-      .single();
-
-    if (
-      bookingError ||
-      !booking
-    ) {
-      console.error(
-        "Payment is paid but booking could not be loaded",
-        {
-          bookingId:
-            payment.booking_id,
-          bookingError
-        }
-      );
-
-      /*
-       * Payment is already confirmed.
-       * Do not return a fake payment failure.
-       * The booking can be reconciled separately.
-       */
-      return new NextResponse(
-        "OK",
-        { status: 200 }
-      );
+    const { processPaymentOutbox } = await import("@/lib/payment-outbox");
+    try {
+      await processPaymentOutbox(payment.id);
+    } catch (outboxError) {
+      console.error("Payment is confirmed but outbox processing needs retry", {
+        paymentId: payment.id,
+        error: outboxError,
+      });
+      return new NextResponse("Payment confirmed; follow-up processing will retry", { status: 500 });
     }
 
-    if (
-      booking.status === "confirmed"
-    ) {
-      const {
-        error: bookingUpdateError
-      } = await supabase
-        .from("bookings")
-        .update({
-          status: "in_progress"
-        })
-        .eq(
-          "id",
-          booking.id
-        )
-        .eq(
-          "status",
-          "confirmed"
-        );
-
-      if (bookingUpdateError) {
-        console.error(
-          "Payment confirmed but booking could not be started",
-          bookingUpdateError
-        );
-
-        return new NextResponse(
-          "OK",
-          { status: 200 }
-        );
-      }
-    }
-
-    /*
-     * ---------------------------------------------------------
-     * 14. ITN successfully processed
-     * ---------------------------------------------------------
-     */
-
-    console.log(
-      "PayFast ITN processed successfully",
-      {
-        paymentId:
-          payment.id,
-        bookingId:
-          payment.booking_id,
-        payfastPaymentId,
-        amountGross
-      }
-    );
-
-    return new NextResponse(
-      "OK",
-      { status: 200 }
-    );
+    console.log("PayFast ITN processed successfully", {
+      paymentId: payment.id,
+      bookingId: payment.booking_id,
+      payfastPaymentId,
+      amountGross,
+    });
+    return new NextResponse("OK", { status: 200 });
   } catch (error) {
     console.error(
       "PayFast ITN processing error",
