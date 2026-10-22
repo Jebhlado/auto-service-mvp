@@ -46,15 +46,84 @@ BEGIN
 END;
 $function$;
 
+-- Complete only while the caller still owns a live claim. The lease check
+-- uses the database clock and is atomic with the update.
+CREATE OR REPLACE FUNCTION public.complete_payment_processing_outbox(
+  p_outbox_id uuid,
+  p_claim_token uuid
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+BEGIN
+  UPDATE public.payment_processing_outbox
+  SET status = 'processed',
+      processed_at = now(),
+      locked_until = NULL,
+      claim_token = NULL,
+      last_error = NULL
+  WHERE id = p_outbox_id
+    AND status = 'processing'
+    AND claim_token = p_claim_token
+    AND locked_until > now();
+
+  RETURN FOUND;
+END;
+$function$;
+
+-- Reschedule only while the caller still owns a live claim. The lease check
+-- uses the database clock and is atomic with the update.
+CREATE OR REPLACE FUNCTION public.retry_payment_processing_outbox(
+  p_outbox_id uuid,
+  p_claim_token uuid,
+  p_available_at timestamptz,
+  p_last_error text
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+BEGIN
+  UPDATE public.payment_processing_outbox
+  SET status = 'pending',
+      available_at = p_available_at,
+      locked_until = NULL,
+      claim_token = NULL,
+      last_error = left(p_last_error, 2000)
+  WHERE id = p_outbox_id
+    AND status = 'processing'
+    AND claim_token = p_claim_token
+    AND locked_until > now();
+
+  RETURN FOUND;
+END;
+$function$;
+
 REVOKE ALL ON FUNCTION
   public.claim_payment_processing_outbox(uuid)
   FROM PUBLIC, anon, authenticated;
-
 GRANT EXECUTE ON FUNCTION
   public.claim_payment_processing_outbox(uuid)
   TO service_role;
 
--- Ensure PostgREST refreshes the composite return type after the column addition.
+REVOKE ALL ON FUNCTION
+  public.complete_payment_processing_outbox(uuid, uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION
+  public.complete_payment_processing_outbox(uuid, uuid)
+  TO service_role;
+
+REVOKE ALL ON FUNCTION
+  public.retry_payment_processing_outbox(uuid, uuid, timestamptz, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION
+  public.retry_payment_processing_outbox(uuid, uuid, timestamptz, text)
+  TO service_role;
+
+-- Ensure PostgREST refreshes the changed composite return type and new RPCs.
 NOTIFY pgrst, 'reload schema';
 
 COMMIT;
