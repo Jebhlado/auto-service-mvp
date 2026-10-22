@@ -1,8 +1,6 @@
 import "server-only";
 
 import { NextRequest, NextResponse } from "next/server";
-import { sendNotification } from "@/lib/notifications";
-import { createNotification } from "@/lib/create-notification";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPayfastConfig } from "@/lib/payfast/config";
 import {
