@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformSettings, isInAppNotificationEnabled } from "@/lib/platform-settings";
 import { sendNotification } from "@/lib/notifications";
 
-type OutboxRow = { id: string; payment_id: string; attempts: number };
+type OutboxRow = { id: string; payment_id: string; attempts: number; claim_token: string };
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -42,6 +42,9 @@ async function processClaimedOutbox(paymentId?: string): Promise<boolean> {
   if (claimError) throw new Error(`Could not claim payment outbox item: ${claimError.message}`);
   const row = (rows as OutboxRow[] | null)?.[0];
   if (!row) return false;
+  if (!row.claim_token) {
+    throw new Error("Claimed outbox item is missing its ownership token.");
+  }
 
   try {
     const { data: payment, error: paymentError } = await supabase
@@ -102,20 +105,51 @@ async function processClaimedOutbox(paymentId?: string): Promise<boolean> {
       if (!result.sent && !result.skipped) throw new Error("Provider payment confirmation email was not sent.");
     }
 
-    const { error: completeError } = await supabase.from("payment_processing_outbox")
-      .update({ status: "processed", processed_at: new Date().toISOString(), locked_until: null, last_error: null })
-      .eq("id", row.id);
+    const { data: completed, error: completeError } = await supabase
+      .from("payment_processing_outbox")
+      .update({
+        status: "processed",
+        processed_at: new Date().toISOString(),
+        locked_until: null,
+        claim_token: null,
+        last_error: null,
+      })
+      .eq("id", row.id)
+      .eq("claim_token", row.claim_token)
+      .gt("locked_until", new Date().toISOString())
+      .select("id")
+      .maybeSingle();
+
     if (completeError) throw new Error(`Could not mark outbox item processed: ${completeError.message}`);
+    if (!completed) {
+      throw new Error("Outbox claim expired or was replaced; completion was not applied.");
+    }
     return true;
   } catch (error) {
     const attempts = Math.max(1, row.attempts || 1);
     const delaySeconds = Math.min(3600, 30 * 2 ** Math.min(attempts - 1, 7));
     const message = errorMessage(error).slice(0, 2000);
-    const { error: retryError } = await supabase.from("payment_processing_outbox").update({
-      status: "pending", available_at: new Date(Date.now() + delaySeconds * 1000).toISOString(),
-      locked_until: null, last_error: message,
-    }).eq("id", row.id);
-    if (retryError) console.error("Failed to reschedule payment outbox item", retryError);
+    const { data: retried, error: retryError } = await supabase
+      .from("payment_processing_outbox")
+      .update({
+        status: "pending",
+        available_at: new Date(Date.now() + delaySeconds * 1000).toISOString(),
+        locked_until: null,
+        claim_token: null,
+        last_error: message,
+      })
+      .eq("id", row.id)
+      .eq("claim_token", row.claim_token)
+      .gt("locked_until", new Date().toISOString())
+      .select("id")
+      .maybeSingle();
+
+    if (retryError || !retried) {
+      console.error("Could not reschedule outbox item or claim was lost", {
+        outboxId: row.id,
+        error: retryError?.message ?? "Claim expired or was replaced",
+      });
+    }
     console.error("Payment outbox processing failed", { outboxId: row.id, paymentId: row.payment_id, error: message });
     throw error;
   }
