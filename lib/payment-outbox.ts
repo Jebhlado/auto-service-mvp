@@ -105,23 +105,13 @@ async function processClaimedOutbox(paymentId?: string): Promise<boolean> {
       if (!result.sent && !result.skipped) throw new Error("Provider payment confirmation email was not sent.");
     }
 
-    const { data: completed, error: completeError } = await supabase
-      .from("payment_processing_outbox")
-      .update({
-        status: "processed",
-        processed_at: new Date().toISOString(),
-        locked_until: null,
-        claim_token: null,
-        last_error: null,
-      })
-      .eq("id", row.id)
-      .eq("claim_token", row.claim_token)
-      .gt("locked_until", new Date().toISOString())
-      .select("id")
-      .maybeSingle();
+    const { data: completed, error: completeError } = await supabase.rpc(
+      "complete_payment_processing_outbox",
+      { p_outbox_id: row.id, p_claim_token: row.claim_token },
+    );
 
     if (completeError) throw new Error(`Could not mark outbox item processed: ${completeError.message}`);
-    if (!completed) {
+    if (completed !== true) {
       throw new Error("Outbox claim expired or was replaced; completion was not applied.");
     }
     return true;
@@ -129,22 +119,17 @@ async function processClaimedOutbox(paymentId?: string): Promise<boolean> {
     const attempts = Math.max(1, row.attempts || 1);
     const delaySeconds = Math.min(3600, 30 * 2 ** Math.min(attempts - 1, 7));
     const message = errorMessage(error).slice(0, 2000);
-    const { data: retried, error: retryError } = await supabase
-      .from("payment_processing_outbox")
-      .update({
-        status: "pending",
-        available_at: new Date(Date.now() + delaySeconds * 1000).toISOString(),
-        locked_until: null,
-        claim_token: null,
-        last_error: message,
-      })
-      .eq("id", row.id)
-      .eq("claim_token", row.claim_token)
-      .gt("locked_until", new Date().toISOString())
-      .select("id")
-      .maybeSingle();
+    const { data: retried, error: retryError } = await supabase.rpc(
+      "retry_payment_processing_outbox",
+      {
+        p_outbox_id: row.id,
+        p_claim_token: row.claim_token,
+        p_available_at: new Date(Date.now() + delaySeconds * 1000).toISOString(),
+        p_last_error: message,
+      },
+    );
 
-    if (retryError || !retried) {
+    if (retryError || retried !== true) {
       console.error("Could not reschedule outbox item or claim was lost", {
         outboxId: row.id,
         error: retryError?.message ?? "Claim expired or was replaced",
