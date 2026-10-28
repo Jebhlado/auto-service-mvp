@@ -138,12 +138,11 @@ begin
   end if;
 
   if tg_op = 'INSERT' then
-    if new.approval_status <> 'pending'
-       or coalesce(new.is_active, false)
-       or new.approved_at is not null then
-      raise exception 'Only a trusted administrator can approve or activate a provider'
-        using errcode = '42501';
-    end if;
+    -- Normalize user-created provider rows to the safe unapproved state.
+    -- This preserves signup while preventing approval/activation spoofing.
+    new.approval_status := 'pending';
+    new.is_active := false;
+    new.approved_at := null;
   elsif new.approval_status is distinct from old.approval_status
      or new.is_active is distinct from old.is_active
      or new.approved_at is distinct from old.approved_at then
