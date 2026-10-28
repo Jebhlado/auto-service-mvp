@@ -62,7 +62,7 @@ $$;
 revoke all on function public.guard_profile_role_changes() from public, anon, authenticated;
 drop trigger if exists profiles_guard_role_changes on public.profiles;
 create trigger profiles_guard_role_changes
-before insert or update of role on public.profiles
+before insert or update on public.profiles
 for each row execute function public.guard_profile_role_changes();
 
 -- Provider users may edit business details but cannot approve or activate
@@ -99,7 +99,7 @@ $$;
 revoke all on function public.guard_provider_approval_changes() from public, anon, authenticated;
 drop trigger if exists provider_profiles_guard_approval on public.provider_profiles;
 create trigger provider_profiles_guard_approval
-before insert or update of approval_status, is_active, approved_at
+before insert or update
 on public.provider_profiles
 for each row execute function public.guard_provider_approval_changes();
 
