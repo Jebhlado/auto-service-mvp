@@ -96,7 +96,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public
-as $
+as $$
 begin
   -- Service-role/server operations generally have no end-user auth.uid().
   if auth.uid() is null or public.is_admin(auth.uid()) then
@@ -115,7 +115,7 @@ begin
 
   return new;
 end;
-$;
+$$;
 
 revoke all on function public.guard_profile_role_changes() from public, anon, authenticated;
 
@@ -131,7 +131,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public
-as $
+as $$
 begin
   if auth.uid() is null or public.is_admin(auth.uid()) then
     return new;
@@ -152,7 +152,7 @@ begin
 
   return new;
 end;
-$;
+$$;
 
 revoke all on function public.guard_provider_approval_changes() from public, anon, authenticated;
 
