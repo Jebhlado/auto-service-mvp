@@ -16,7 +16,11 @@ export async function signupAction(formData: FormData) {
   const phone = String(formData.get("phone") ?? "");
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
-  const role = String(formData.get("role") ?? "customer");
+  const requestedRole = String(formData.get("role") ?? "customer");
+  if (requestedRole !== "customer" && requestedRole !== "provider") {
+    redirect(`/auth?error=${encodeURIComponent("Please choose a valid account type.")}`);
+  }
+  const role = requestedRole;
 
   const { data, error } = await supabase.auth.signUp({
     email,
