@@ -40,7 +40,7 @@ create table if not exists public.bookings (
   provider_id uuid not null references public.provider_profiles(user_id) on delete cascade,
   appointment_date date not null,
   issue_description text not null,
-  status text not null default 'pending' check (status in ('pending', 'confirmed', 'rejected')),
+  status text not null default 'pending' check (status in ('pending', 'confirmed', 'rejected', 'in_progress', 'completed', 'closed', 'cancelled')),
   created_at timestamptz not null default now()
 );
 
@@ -86,6 +86,43 @@ $$;
 
 revoke all on function public.is_admin(uuid) from public;
 grant execute on function public.is_admin(uuid) to authenticated, anon;
+
+-- Prevent users from assigning themselves privileged roles through direct
+-- PostgREST writes or profile upserts. Trusted server-side service-role
+-- operations may still manage roles; authenticated admins may manage roles.
+create or replace function public.guard_profile_role_changes()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $
+begin
+  -- Service-role/server operations generally have no end-user auth.uid().
+  if auth.uid() is null or public.is_admin(auth.uid()) then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    if new.role not in ('customer', 'provider') then
+      raise exception 'Only a trusted administrator can assign this profile role'
+        using errcode = '42501';
+    end if;
+  elsif new.role is distinct from old.role then
+    raise exception 'Only a trusted administrator can change a profile role'
+      using errcode = '42501';
+  end if;
+
+  return new;
+end;
+$;
+
+revoke all on function public.guard_profile_role_changes() from public, anon, authenticated;
+
+drop trigger if exists profiles_guard_role_changes on public.profiles;
+create trigger profiles_guard_role_changes
+before insert or update of role on public.profiles
+for each row
+execute function public.guard_profile_role_changes();
 
 drop policy if exists "profiles_select_own" on public.profiles;
 create policy "profiles_select_own"
