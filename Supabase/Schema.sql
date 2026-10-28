@@ -124,6 +124,45 @@ before insert or update of role on public.profiles
 for each row
 execute function public.guard_profile_role_changes();
 
+-- Provider-owned profile writes must never grant approval or activate a listing.
+create or replace function public.guard_provider_approval_changes()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $
+begin
+  if auth.uid() is null or public.is_admin(auth.uid()) then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    if new.approval_status <> 'pending'
+       or coalesce(new.is_active, false)
+       or new.approved_at is not null then
+      raise exception 'Only a trusted administrator can approve or activate a provider'
+        using errcode = '42501';
+    end if;
+  elsif new.approval_status is distinct from old.approval_status
+     or new.is_active is distinct from old.is_active
+     or new.approved_at is distinct from old.approved_at then
+    raise exception 'Only a trusted administrator can change provider approval'
+      using errcode = '42501';
+  end if;
+
+  return new;
+end;
+$;
+
+revoke all on function public.guard_provider_approval_changes() from public, anon, authenticated;
+
+drop trigger if exists provider_profiles_guard_approval on public.provider_profiles;
+create trigger provider_profiles_guard_approval
+before insert or update of approval_status, is_active, approved_at
+on public.provider_profiles
+for each row
+execute function public.guard_provider_approval_changes();
+
 drop policy if exists "profiles_select_own" on public.profiles;
 create policy "profiles_select_own"
 on public.profiles
