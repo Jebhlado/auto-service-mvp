@@ -23,9 +23,15 @@ export function AuthForm() {
     const phone = String(formData.get("phone") ?? "");
     const email = String(formData.get("email") ?? "");
     const password = String(formData.get("password") ?? "");
-    const role = String(formData.get("role") ?? "customer");
+    const requestedRole = String(formData.get("role") ?? "customer");
+    const role = requestedRole === "provider" ? "provider" : "customer";
 
     setError(null);
+
+    if (requestedRole !== "customer" && requestedRole !== "provider") {
+      setError("Please choose a valid account type.");
+      return;
+    }
 
     const { data, error: signupError } = await supabase.auth.signUp({
       email,
