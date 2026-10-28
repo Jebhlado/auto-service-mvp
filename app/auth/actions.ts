@@ -31,7 +31,7 @@ export async function signupAction(formData: FormData) {
     redirect(`/auth?error=${encodeURIComponent(error?.message ?? "Unable to sign up")}`);
   }
 
-  await supabase.from("profiles").upsert({
+  const { error: profileError } = await supabase.from("profiles").upsert({
     id: data.user.id,
     role,
     full_name: fullName,
@@ -39,8 +39,13 @@ export async function signupAction(formData: FormData) {
     phone
   });
 
+  if (profileError) {
+    console.error("Profile creation failed:", profileError.message);
+    redirect(`/auth?error=${encodeURIComponent("Your account was created, but its profile could not be initialized. Please contact support before trying again.")}`);
+  }
+
   if (role === "provider") {
-    await supabase.from("provider_profiles").upsert({
+    const { error: providerProfileError } = await supabase.from("provider_profiles").upsert({
       user_id: data.user.id,
       business_name: fullName,
       services: parseServicesInput("Mechanic"),
@@ -48,8 +53,15 @@ export async function signupAction(formData: FormData) {
       contact_email: email,
       contact_phone: phone,
       bio: "",
-      approval_status: "pending"
+      approval_status: "pending",
+      is_active: false,
+      approved_at: null
     });
+
+    if (providerProfileError) {
+      console.error("Provider profile initialization failed:", providerProfileError.message);
+      redirect(`/auth?error=${encodeURIComponent("Your account was created, but provider onboarding could not be initialized. Please contact support.")}`);
+    }
   }
 
   // In some Supabase setups signUp creates the user but does not leave an
