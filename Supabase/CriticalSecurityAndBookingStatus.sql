@@ -41,7 +41,7 @@ security definer
 set search_path = public
 as $$
 begin
-  if auth.uid() is null or public.is_admin(auth.uid()) then
+  if auth.role() = 'service_role' or public.is_admin(auth.uid()) then
     return new;
   end if;
 
@@ -74,7 +74,7 @@ security definer
 set search_path = public
 as $$
 begin
-  if auth.uid() is null or public.is_admin(auth.uid()) then
+  if auth.role() = 'service_role' or public.is_admin(auth.uid()) then
     return new;
   end if;
 
