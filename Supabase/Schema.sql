@@ -48,6 +48,7 @@ create table if not exists public.bookings (
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
+set search_path = pg_catalog, public
 as $$
 begin
   new.updated_at = now();
@@ -72,21 +73,25 @@ alter table public.provider_payment_accounts enable row level security;
 alter table public.provider_profiles enable row level security;
 alter table public.bookings enable row level security;
 
-create or replace function public.is_admin(check_user_id uuid default auth.uid())
+-- This function checks only the caller's own identity. It intentionally accepts
+-- no user-supplied UUID, preventing arbitrary administrator-status probing.
+create or replace function public.is_admin()
 returns boolean
 language sql
 stable
 security definer
-set search_path = public
+set search_path = pg_catalog, public
 as $$
   select exists (
-    select 1 from public.profiles
-    where id = check_user_id and role = 'admin'
+    select 1
+    from public.profiles
+    where id = auth.uid()
+      and role = 'admin'
   );
 $$;
 
-revoke all on function public.is_admin(uuid) from public;
-grant execute on function public.is_admin(uuid) to authenticated, anon;
+revoke all on function public.is_admin() from public, anon;
+grant execute on function public.is_admin() to authenticated;
 
 -- Prevent users from assigning themselves privileged roles through direct
 -- PostgREST writes or profile upserts. Trusted server-side service-role
@@ -95,11 +100,10 @@ create or replace function public.guard_profile_role_changes()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = pg_catalog, public
 as $$
 begin
-  -- Service-role/server operations generally have no end-user auth.uid().
-  if auth.role() = 'service_role' or public.is_admin(auth.uid()) then
+  if auth.role() = 'service_role' or public.is_admin() then
     return new;
   end if;
 
@@ -130,16 +134,14 @@ create or replace function public.guard_provider_approval_changes()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = pg_catalog, public
 as $$
 begin
-  if auth.role() = 'service_role' or public.is_admin(auth.uid()) then
+  if auth.role() = 'service_role' or public.is_admin() then
     return new;
   end if;
 
   if tg_op = 'INSERT' then
-    -- Normalize user-created provider rows to the safe unapproved state.
-    -- This preserves signup while preventing approval/activation spoofing.
     new.approval_status := 'pending';
     new.is_active := false;
     new.approved_at := null;
@@ -186,11 +188,22 @@ using (auth.uid() = id or public.is_admin())
 with check (auth.uid() = id or public.is_admin());
 
 drop policy if exists "providers_public_read_approved" on public.provider_profiles;
+drop policy if exists "providers_authenticated_read" on public.provider_profiles;
 create policy "providers_public_read_approved"
 on public.provider_profiles
 for select
-to authenticated, anon
-using (approval_status = 'approved' or auth.uid() = user_id or public.is_admin());
+to anon
+using (approval_status = 'approved' and is_active = true);
+
+create policy "providers_authenticated_read"
+on public.provider_profiles
+for select
+to authenticated
+using (
+  (approval_status = 'approved' and is_active = true)
+  or auth.uid() = user_id
+  or public.is_admin()
+);
 
 drop policy if exists "providers_insert_own" on public.provider_profiles;
 create policy "providers_insert_own"
