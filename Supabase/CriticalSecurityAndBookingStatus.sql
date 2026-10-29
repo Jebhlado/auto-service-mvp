@@ -1,11 +1,30 @@
--- Critical authorization and booking-status safeguards.
--- Apply only after reviewing against the target database; do not run against production
--- until the migration is approved and backed up.
+-- Harden administrator checks and booking statuses.
+-- Run after the core schema and platform_settings table exist.
+-- This migration is transactional and deliberately fails if expected schema is absent.
 
 begin;
 
--- Booking statuses used by the application and payment outbox.
--- Fail explicitly if existing data contains an unrecognized value.
+do $$
+begin
+  if to_regclass('public.profiles') is null
+     or to_regclass('public.provider_profiles') is null
+     or to_regclass('public.provider_payment_accounts') is null
+     or to_regclass('public.bookings') is null
+     or to_regclass('public.platform_settings') is null then
+    raise exception 'Security migration prerequisites missing: core tables and platform_settings must exist';
+  end if;
+
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'provider_profiles'
+      and column_name = 'is_active'
+  ) then
+    raise exception 'Security migration prerequisite missing: provider_profiles.is_active';
+  end if;
+end;
+$$;
+
 do $$
 declare invalid_statuses text;
 begin
@@ -23,25 +42,62 @@ $$;
 
 alter table public.bookings
   drop constraint if exists bookings_status_check;
-
+alter table public.bookings
+  drop constraint if exists bookings_status_allowed_check;
 alter table public.bookings
   add constraint bookings_status_allowed_check
   check (status in ('pending', 'confirmed', 'rejected', 'in_progress', 'completed', 'closed', 'cancelled'))
   not valid;
-
 alter table public.bookings
   validate constraint bookings_status_allowed_check;
 
--- A normal authenticated user may create only customer/provider profiles and
--- may never promote their own role. Existing admins can manage roles.
+-- Drop policies before removing the legacy function: PostgreSQL records function
+-- dependencies in policy expressions. Recreate every known dependent policy below.
+drop policy if exists "profiles_select_own" on public.profiles;
+drop policy if exists "profiles_insert_own" on public.profiles;
+drop policy if exists "profiles_update_own" on public.profiles;
+drop policy if exists "providers_public_read_approved" on public.provider_profiles;
+drop policy if exists "providers_authenticated_read" on public.provider_profiles;
+drop policy if exists "providers_insert_own" on public.provider_profiles;
+drop policy if exists "providers_update_own" on public.provider_profiles;
+drop policy if exists "provider_payment_accounts_select_own" on public.provider_payment_accounts;
+drop policy if exists "provider_payment_accounts_insert_own" on public.provider_payment_accounts;
+drop policy if exists "provider_payment_accounts_update_own" on public.provider_payment_accounts;
+drop policy if exists "bookings_insert_customer" on public.bookings;
+drop policy if exists "bookings_customer_read" on public.bookings;
+drop policy if exists "bookings_provider_update" on public.bookings;
+drop policy if exists "platform_settings_admin_select" on public.platform_settings;
+drop policy if exists "platform_settings_admin_insert" on public.platform_settings;
+drop policy if exists "platform_settings_admin_update" on public.platform_settings;
+
+-- Current-user-only check: there is no UUID parameter to probe other users.
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where id = auth.uid()
+      and role = 'admin'
+  );
+$$;
+
+revoke all on function public.is_admin() from public, anon;
+grant execute on function public.is_admin() to authenticated;
+
+-- Replace trigger bodies to use the current-user-only function.
 create or replace function public.guard_profile_role_changes()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = pg_catalog, public
 as $$
 begin
-  if auth.role() = 'service_role' or public.is_admin(auth.uid()) then
+  if auth.role() = 'service_role' or public.is_admin() then
     return new;
   end if;
 
@@ -54,33 +110,23 @@ begin
     raise exception 'Only a trusted administrator can change a profile role'
       using errcode = '42501';
   end if;
-
   return new;
 end;
 $$;
-
 revoke all on function public.guard_profile_role_changes() from public, anon, authenticated;
-drop trigger if exists profiles_guard_role_changes on public.profiles;
-create trigger profiles_guard_role_changes
-before insert or update on public.profiles
-for each row execute function public.guard_profile_role_changes();
 
--- Provider users may edit business details but cannot approve or activate
--- themselves. Admins and trusted server-side service-role operations can.
 create or replace function public.guard_provider_approval_changes()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = pg_catalog, public
 as $$
 begin
-  if auth.role() = 'service_role' or public.is_admin(auth.uid()) then
+  if auth.role() = 'service_role' or public.is_admin() then
     return new;
   end if;
 
   if tg_op = 'INSERT' then
-    -- Normalize user-created provider rows to the safe unapproved state.
-    -- This preserves signup while preventing approval/activation spoofing.
     new.approval_status := 'pending';
     new.is_active := false;
     new.approved_at := null;
@@ -90,16 +136,91 @@ begin
     raise exception 'Only a trusted administrator can change provider approval'
       using errcode = '42501';
   end if;
-
   return new;
 end;
 $$;
-
 revoke all on function public.guard_provider_approval_changes() from public, anon, authenticated;
-drop trigger if exists provider_profiles_guard_approval on public.provider_profiles;
-create trigger provider_profiles_guard_approval
-before insert or update
+
+-- Public directory reads never need to invoke an administrator predicate.
+create policy "providers_public_read_approved"
 on public.provider_profiles
-for each row execute function public.guard_provider_approval_changes();
+for select
+to anon
+using (approval_status = 'approved' and is_active = true);
+
+create policy "providers_authenticated_read"
+on public.provider_profiles
+for select
+to authenticated
+using (
+  (approval_status = 'approved' and is_active = true)
+  or auth.uid() = user_id
+  or public.is_admin()
+);
+
+create policy "profiles_select_own"
+on public.profiles for select to authenticated
+using (auth.uid() = id or public.is_admin());
+
+create policy "profiles_insert_own"
+on public.profiles for insert to authenticated
+with check (auth.uid() = id or public.is_admin());
+
+create policy "profiles_update_own"
+on public.profiles for update to authenticated
+using (auth.uid() = id or public.is_admin())
+with check (auth.uid() = id or public.is_admin());
+
+create policy "providers_insert_own"
+on public.provider_profiles for insert to authenticated
+with check (auth.uid() = user_id or public.is_admin());
+
+create policy "providers_update_own"
+on public.provider_profiles for update to authenticated
+using (auth.uid() = user_id or public.is_admin())
+with check (auth.uid() = user_id or public.is_admin());
+
+create policy "provider_payment_accounts_select_own"
+on public.provider_payment_accounts for select to authenticated
+using (auth.uid() = provider_id or public.is_admin());
+
+create policy "provider_payment_accounts_insert_own"
+on public.provider_payment_accounts for insert to authenticated
+with check (auth.uid() = provider_id or public.is_admin());
+
+create policy "provider_payment_accounts_update_own"
+on public.provider_payment_accounts for update to authenticated
+using (auth.uid() = provider_id or public.is_admin())
+with check (auth.uid() = provider_id or public.is_admin());
+
+create policy "bookings_insert_customer"
+on public.bookings for insert to authenticated
+with check (auth.uid() = customer_id or public.is_admin());
+
+create policy "bookings_customer_read"
+on public.bookings for select to authenticated
+using (auth.uid() = customer_id or auth.uid() = provider_id or public.is_admin());
+
+create policy "bookings_provider_update"
+on public.bookings for update to authenticated
+using (auth.uid() = provider_id or public.is_admin())
+with check (auth.uid() = provider_id or public.is_admin());
+
+create policy "platform_settings_admin_select"
+on public.platform_settings for select to authenticated
+using (public.is_admin());
+
+create policy "platform_settings_admin_insert"
+on public.platform_settings for insert to authenticated
+with check (public.is_admin());
+
+create policy "platform_settings_admin_update"
+on public.platform_settings for update to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+-- Remove the arbitrary-UUID overload only after all dependent policies are replaced.
+revoke all on function public.is_admin(uuid) from public, anon, authenticated;
+drop function if exists public.is_admin(uuid);
 
 commit;
