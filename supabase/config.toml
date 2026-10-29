@@ -1,0 +1,8 @@
+project_id = "auto-service-mvp"
+
+[db]
+major_version = 17
+
+[db.migrations]
+enabled = true
+schema_paths = []
