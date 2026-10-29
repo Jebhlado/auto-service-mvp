@@ -1,6 +1,6 @@
--- Mechanic Connect platform settings
--- Run this script in the Supabase SQL Editor before using /admin/settings.
+-- Mechanic Connect platform settings.
 -- Secrets (PayFast credentials, Supabase keys, Resend API keys) must remain in environment variables.
+-- This legacy SQL source mirrors supabase/migrations/20261029091000_admin_settings.sql.
 
 create table if not exists public.platform_settings (
   id text primary key default 'default' check (id = 'default'),
@@ -36,36 +36,32 @@ values ('default')
 on conflict (id) do nothing;
 
 alter table public.platform_settings enable row level security;
+revoke all on table public.platform_settings from public, anon;
+grant select, insert, update on table public.platform_settings to authenticated;
 
 drop policy if exists "platform_settings_admin_select" on public.platform_settings;
 create policy "platform_settings_admin_select"
 on public.platform_settings
-for select
-to authenticated
+for select to authenticated
 using (public.is_admin());
 
 drop policy if exists "platform_settings_admin_insert" on public.platform_settings;
 create policy "platform_settings_admin_insert"
 on public.platform_settings
-for insert
-to authenticated
+for insert to authenticated
 with check (public.is_admin());
 
 drop policy if exists "platform_settings_admin_update" on public.platform_settings;
 create policy "platform_settings_admin_update"
 on public.platform_settings
-for update
-to authenticated
+for update to authenticated
 using (public.is_admin())
 with check (public.is_admin());
-
-revoke all on table public.platform_settings from anon;
-grant select, insert, update on table public.platform_settings to authenticated;
 
 create or replace function public.set_platform_settings_updated_at()
 returns trigger
 language plpgsql
-set search_path = public
+set search_path = pg_catalog, public
 as $$
 begin
   new.updated_at = now();
