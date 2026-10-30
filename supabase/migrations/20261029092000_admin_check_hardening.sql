@@ -214,13 +214,13 @@ on public.platform_settings for update to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
-do $
+do $$
 begin
   if to_regprocedure('public.is_admin(uuid)') is not null then
     revoke all on function public.is_admin(uuid) from public, anon, authenticated;
     drop function public.is_admin(uuid);
   end if;
 end;
-$;
+$$;
 
 commit;
