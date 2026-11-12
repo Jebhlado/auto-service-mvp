@@ -27,6 +27,7 @@
     "@types/react-dom": "^19.1.2",
     "eslint": "^9.39.4",
     "eslint-config-next": "^15.5.26",
+    "supabase": "^2.122.0",
     "typescript": "^5.8.3"
   },
   "overrides": {

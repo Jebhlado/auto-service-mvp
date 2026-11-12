@@ -31,7 +31,7 @@ export async function signupAction(formData: FormData) {
     redirect(`/auth?error=${encodeURIComponent(error?.message ?? "Unable to sign up")}`);
   }
 
-  const { error: profileError } = await supabase.from("profiles").upsert({
+  const { error: profileError } = await supabase.from("profiles").insert({
     id: data.user.id,
     role,
     full_name: fullName,
@@ -45,18 +45,17 @@ export async function signupAction(formData: FormData) {
   }
 
   if (role === "provider") {
-    const { error: providerProfileError } = await supabase.from("provider_profiles").upsert({
-      user_id: data.user.id,
-      business_name: fullName,
-      services: parseServicesInput("Mechanic"),
-      location: "",
-      contact_email: email,
-      contact_phone: phone,
-      bio: "",
-      approval_status: "pending",
-      is_active: false,
-      approved_at: null
-    });
+    const { error: providerProfileError } = await supabase
+      .from("provider_profiles")
+      .insert({
+        user_id: data.user.id,
+        business_name: fullName,
+        services: parseServicesInput("Mechanic"),
+        location: "",
+        contact_email: email,
+        contact_phone: phone,
+        bio: "",
+      });
 
     if (providerProfileError) {
       console.error("Provider profile initialization failed:", providerProfileError.message);

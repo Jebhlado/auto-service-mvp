@@ -26,6 +26,8 @@ export type ProviderProfileRecord = {
   contact_email: string;
   contact_phone: string;
   bio: string | null;
+  years_experience: string | null;
+  mobile_service: boolean | null;
   approval_status: ApprovalStatus;
   approved_at: string | null;
   created_at: string;

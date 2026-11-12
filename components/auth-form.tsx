@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useTransition } from "react";
@@ -15,6 +16,9 @@ export function AuthForm() {
   const [mode, setMode] = useState<"login" | "signup">("signup");
   const [error, setError] = useState<string | null>(null);
   const [isPending] = useTransition();
+  const [resetMode, setResetMode] = useState(false);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
+
   const router = useRouter();
 
   async function handleSignup(formData: FormData) {
@@ -35,7 +39,7 @@ export function AuthForm() {
 
     const { data, error: signupError } = await supabase.auth.signUp({
       email,
-      password
+      password,
     });
 
     if (signupError || !data.user) {
@@ -50,12 +54,12 @@ export function AuthForm() {
       return;
     }
 
-    const { error: profileError } = await supabase.from("profiles").upsert({
+    const { error: profileError } = await supabase.from("profiles").insert({
       id: authState.user.id,
       role,
       full_name: fullName,
       email,
-      phone
+      phone,
     });
 
     if (profileError) {
@@ -63,7 +67,7 @@ export function AuthForm() {
       return;
     }
 
-    // ✅ AUTO-COMPLETE BOOKING IF EXISTS
+    // Complete a saved booking if one exists.
     const draft = localStorage.getItem("bookingDraft");
 
     if (draft) {
@@ -72,16 +76,15 @@ export function AuthForm() {
       await fetch("/api/create-booking", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify(booking)
+        body: JSON.stringify(booking),
       });
 
       localStorage.removeItem("bookingDraft");
     }
 
-    const nextPath = redirectForRole(role);
-    router.push(nextPath);
+    router.push(redirectForRole(role));
   }
 
   async function handleLogin(formData: FormData) {
@@ -91,13 +94,14 @@ export function AuthForm() {
 
     setError(null);
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
+    const { data, error: loginError } =
+      await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error || !data.user) {
-      setError(error?.message ?? "Unable to sign in.");
+    if (loginError || !data.user) {
+      setError(loginError?.message ?? "Unable to sign in.");
       return;
     }
 
@@ -112,7 +116,7 @@ export function AuthForm() {
       return;
     }
 
-    // ✅ AUTO-COMPLETE BOOKING IF EXISTS
+    // Complete a saved booking if one exists.
     const draft = localStorage.getItem("bookingDraft");
 
     if (draft) {
@@ -121,56 +125,201 @@ export function AuthForm() {
       await fetch("/api/create-booking", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify(booking)
+        body: JSON.stringify(booking),
       });
 
       localStorage.removeItem("bookingDraft");
     }
 
-    const nextPath = redirectForRole(profile.role);
-    router.push(nextPath);
+    router.push(redirectForRole(profile.role));
+  }
+
+  async function handlePasswordReset(formData: FormData) {
+    const supabase = createClient();
+    const email = String(formData.get("email") ?? "").trim();
+
+    setError(null);
+    setResetMessage(null);
+
+    const { error: resetError } =
+      await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+      });
+
+    if (resetError) {
+      setError(
+        "We couldn't process your password reset request. Please try again."
+      );
+      return;
+    }
+
+    setResetMessage(
+      "If an account exists for that email address, a password recovery link will be sent."
+    );
   }
 
   return (
     <div className="auth-card">
-      <div className="segmented">
-        <button type="button" className={cn(mode === "signup" && "active")} onClick={() => setMode("signup")}>
-          Sign up
-        </button>
-        <button type="button" className={cn(mode === "login" && "active")} onClick={() => setMode("login")}>
-          Log in
-        </button>
-      </div>
+      {!resetMode ? (
+        <div className="segmented">
+          <button
+            type="button"
+            className={cn(mode === "signup" && "active")}
+            onClick={() => {
+              setMode("signup");
+              setError(null);
+            }}
+          >
+            Sign up
+          </button>
+
+          <button
+            type="button"
+            className={cn(mode === "login" && "active")}
+            onClick={() => {
+              setMode("login");
+              setError(null);
+            }}
+          >
+            Log in
+          </button>
+        </div>
+      ) : null}
 
       {error ? (
-        <div className="card">
+        <div className="card" role="alert">
           <strong>Something needs attention</strong>
           <p className="muted">{error}</p>
         </div>
       ) : null}
 
-      {mode === "signup" ? (
+      {resetMode ? (
+        <form action={handlePasswordReset} className="stack-md">
+          <h2>Reset your password</h2>
+
+          <p className="muted">
+            Enter your email address and we&apos;ll send a password recovery link
+            if an account exists.
+          </p>
+
+          <input
+            name="email"
+            type="email"
+            placeholder="Email address"
+            autoComplete="email"
+            required
+          />
+
+          <button
+            className="button-primary"
+            type="submit"
+            disabled={isPending}
+          >
+            {isPending ? "Sending..." : "Send recovery link"}
+          </button>
+
+          {resetMessage ? (
+            <p className="muted" role="status">
+              {resetMessage}
+            </p>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={() => {
+              setResetMode(false);
+              setResetMessage(null);
+              setError(null);
+            }}
+          >
+            Back to log in
+          </button>
+        </form>
+      ) : mode === "signup" ? (
         <form action={handleSignup} className="stack-md">
-          <input name="fullName" placeholder="Full name" required />
-          <input name="phone" placeholder="Phone number" required />
-          <input name="email" type="email" placeholder="Email address" required />
-          <input name="password" type="password" placeholder="Password" minLength={6} required />
+          <input
+            name="fullName"
+            placeholder="Full name"
+            autoComplete="name"
+            required
+          />
+
+          <input
+            name="phone"
+            type="tel"
+            placeholder="Phone number"
+            autoComplete="tel"
+            required
+          />
+
+          <input
+            name="email"
+            type="email"
+            placeholder="Email address"
+            autoComplete="email"
+            required
+          />
+
+          <input
+            name="password"
+            type="password"
+            placeholder="Password"
+            autoComplete="new-password"
+            minLength={6}
+            required
+          />
+
           <select name="role" defaultValue="customer" required>
             <option value="customer">Customer</option>
             <option value="provider">Service provider</option>
           </select>
-          <button className="button-primary" type="submit" disabled={isPending}>
+
+          <button
+            className="button-primary"
+            type="submit"
+            disabled={isPending}
+          >
             {isPending ? "Creating account..." : "Create account"}
           </button>
         </form>
       ) : (
         <form action={handleLogin} className="stack-md">
-          <input name="email" type="email" placeholder="Email address" required />
-          <input name="password" type="password" placeholder="Password" minLength={6} required />
-          <button className="button-primary" type="submit" disabled={isPending}>
+          <input
+            name="email"
+            type="email"
+            placeholder="Email address"
+            autoComplete="email"
+            required
+          />
+
+          <input
+            name="password"
+            type="password"
+            placeholder="Password"
+            autoComplete="current-password"
+            minLength={6}
+            required
+          />
+
+          <button
+            className="button-primary"
+            type="submit"
+            disabled={isPending}
+          >
             {isPending ? "Logging in..." : "Log in"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setResetMode(true);
+              setResetMessage(null);
+              setError(null);
+            }}
+          >
+            Forgot password?
           </button>
         </form>
       )}

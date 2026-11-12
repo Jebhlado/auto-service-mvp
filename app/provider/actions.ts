@@ -1,13 +1,15 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { escapeNotificationHtml, sendNotification } from "@/lib/notifications";
-import { createNotification } from "@/lib/create-notification";
 import { getPlatformSettings } from "@/lib/platform-settings";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createNotification } from "@/lib/create-notification";
+import {
+  escapeNotificationHtml,
+  sendNotification,
+} from "@/lib/notifications";
 
 export async function saveProviderProfileAction(input: {
   businessName: string;
@@ -16,7 +18,10 @@ export async function saveProviderProfileAction(input: {
   contactEmail: string;
   contactPhone: string;
   bio: string;
+  yearsExperience: number;
+  mobileService: boolean;
 }) {
+
   const { user } = await requireRole(["provider"]);
   const settings = await getPlatformSettings();
 
@@ -26,41 +31,73 @@ export async function saveProviderProfileAction(input: {
   const contactEmail = input.contactEmail.trim().slice(0, 254);
   const contactPhone = input.contactPhone.trim().slice(0, 40);
   const bio = input.bio.trim().slice(0, 2000);
+  const yearsExperience = input.yearsExperience;
+  const mobileService = input.mobileService;
 
-  if (!businessName || !service || !location || !contactEmail || !contactPhone) {
-    return { success: false, message: "Complete all required profile fields." };
+  if (
+    !Number.isInteger(yearsExperience) ||
+    yearsExperience < 0 ||
+    yearsExperience > 60
+  ) {
+    return {
+      success: false,
+      message: "Enter a valid number of years of experience.",
+    };
+  }
+
+  if (
+    !businessName ||
+    !service ||
+    !location ||
+    !contactEmail ||
+    !contactPhone
+  ) {
+    return {
+      success: false,
+      message: "Complete all required profile fields.",
+    };
   }
 
   if (!settings.provider_management.service_categories.includes(service)) {
-    return { success: false, message: "This service category is no longer available. Refresh the page and choose an available category." };
+    return {
+      success: false,
+      message: "This service category is no longer available. Refresh the page and choose an available category.",
+    };
   }
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
-    return { success: false, message: "Enter a valid contact email address." };
+    return {
+      success: false,
+      message: "Enter a valid contact email address.",
+    };
   }
 
-  const requireApproval = settings.provider_management.require_approval;
-  const approvalStatus = requireApproval ? "pending" : "approved";
-  // This privileged write is safe because the authenticated provider role was
-  // verified above and the target user_id always comes from the verified session.
-  const supabase = createAdminClient();
+  const supabase = await createClient();
 
-  const { error } = await supabase.from("provider_profiles").upsert({
-    user_id: user.id,
-    business_name: businessName,
-    services: [service],
-    location,
-    contact_email: contactEmail,
-    contact_phone: contactPhone,
-    bio,
-    approval_status: approvalStatus,
-    is_active: !requireApproval,
-    approved_at: requireApproval ? null : new Date().toISOString(),
-  });
+  const { error } = await supabase.from("provider_profiles").upsert(
+    {
+      user_id: user.id,
+      business_name: businessName,
+      services: [service],
+      location,
+      contact_email: contactEmail,
+      contact_phone: contactPhone,
+      bio,
+      years_experience: String(yearsExperience),
+      mobile_service: mobileService,
+    },
+    {
+      onConflict: "user_id",
+    }
+  );
 
   if (error) {
     console.error("Provider profile save failed:", error.message);
-    return { success: false, message: "Your provider profile could not be saved. Please try again." };
+
+    return {
+      success: false,
+      message: "Your provider profile could not be saved. Please try again.",
+    };
   }
 
   revalidatePath("/provider");
@@ -69,11 +106,10 @@ export async function saveProviderProfileAction(input: {
 
   return {
     success: true,
-    message: requireApproval
-      ? "Your profile was saved and sent for administrator review."
-      : "Your profile is approved and active. Customers can now find your services.",
+    message: "Your profile was saved and submitted for administrator review.",
   };
 }
+
 
 export async function createBookingAction(formData: FormData) {
   const { user, profile } = await requireRole(["customer"]);

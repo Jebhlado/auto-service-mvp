@@ -3,82 +3,123 @@
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { sendNotification } from "@/lib/notifications";
+import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  escapeNotificationHtml,
+  sendNotification,
+} from "@/lib/notifications";
 
 export async function updateProviderApprovalAction(formData: FormData) {
   await requireRole(["admin"]);
-  const supabase = await createClient();
-  const providerId = String(formData.get("providerId") ?? "");
-  const status = String(formData.get("status") ?? "");
 
-  const { data: provider } = await supabase
-    .from("provider_profiles")
-    .select("business_name, contact_email")
-    .eq("user_id", providerId)
-    .single();
+  const providerId = String(formData.get("providerId") ?? "").trim();
+  const status = String(formData.get("status") ?? "").trim();
 
-  const { error } = await supabase
-    .from("provider_profiles")
-    .update({
-  approval_status: status,
-  is_active: status === "approved",
-  approved_at:
-    status === "approved"
-      ? new Date().toISOString()
-      : null
-})
-    .eq("user_id", providerId);
+  const validStatuses = ["pending", "approved", "rejected"] as const;
 
-  if (error) {
-    redirect(`/admin?error=${encodeURIComponent(error.message)}`);
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(providerId) ||
+    !validStatuses.includes(status as (typeof validStatuses)[number])
+  ) {
+    redirect("/admin?error=invalid-provider-details");
   }
 
-  if (provider?.contact_email) {
+  const supabase = createAdminClient();
+
+  const { data: provider, error: fetchError } = await supabase
+    .from("provider_profiles")
+    .select("user_id, business_name, contact_email")
+    .eq("user_id", providerId)
+    .maybeSingle();
+
+  if (fetchError || !provider) {
+    redirect("/admin?error=provider-not-found");
+  }
+
+  const { data: updatedProvider, error } = await supabase
+    .from("provider_profiles")
+    .update({
+      approval_status: status,
+      is_active: status === "approved",
+      approved_at:
+        status === "approved" ? new Date().toISOString() : null,
+    })
+    .eq("user_id", providerId)
+    .select("user_id")
+    .maybeSingle();
+
+  if (error || !updatedProvider) {
+    redirect(
+      `/admin?error=${encodeURIComponent(
+        error?.message ?? "Provider approval could not be updated."
+      )}`
+    );
+  }
+
+  if (provider.contact_email) {
+    const businessName = provider.business_name || "your business";
+    const safeBusinessName = escapeNotificationHtml(businessName);
+    const safeStatus = escapeNotificationHtml(status);
+
     await sendNotification({
       to: provider.contact_email,
       subject: `Provider profile ${status}`,
-      html: `<p>Your provider profile for ${provider.business_name} is now ${status}.</p>`,
-      text: `Your provider profile for ${provider.business_name} is now ${status}.`
+      html: `<p>Your provider profile for ${safeBusinessName} is now ${safeStatus}.</p>`,
+      text: `Your provider profile for ${businessName} is now ${status}.`,
     });
   }
 
   redirect("/admin?success=provider-updated");
 }
 
-export async function toggleProviderStatusAction(
-  formData: FormData
-) {
+
+export async function toggleProviderStatusAction(formData: FormData) {
   await requireRole(["admin"]);
 
-  const supabase = await createClient();
+  const providerId = String(formData.get("providerId") ?? "").trim();
 
-  const providerId = String(
-    formData.get("providerId") ?? ""
-  );
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(providerId)
+  ) {
+    redirect("/admin?error=invalid-provider-details");
+  }
 
-  const isActive =
-    String(formData.get("isActive")) ===
-    "true";
+  const supabase = createAdminClient();
 
-  const { error } = await supabase
+  const { data: provider, error: fetchError } = await supabase
     .from("provider_profiles")
-    .update({
-      is_active: !isActive
-    })
-    .eq("user_id", providerId);
+    .select("user_id, approval_status, is_active")
+    .eq("user_id", providerId)
+    .maybeSingle();
 
-  if (error) {
+  if (fetchError || !provider) {
+    redirect("/admin?error=provider-not-found");
+  }
+
+  const nextIsActive = !provider.is_active;
+
+  if (nextIsActive && provider.approval_status !== "approved") {
+    redirect("/admin?error=provider-must-be-approved-first");
+  }
+
+  const { data: updatedProvider, error } = await supabase
+    .from("provider_profiles")
+    .update({ is_active: nextIsActive })
+    .eq("user_id", providerId)
+    .select("user_id")
+    .maybeSingle();
+
+  if (error || !updatedProvider) {
     redirect(
       `/admin?error=${encodeURIComponent(
-        error.message
+        error?.message ?? "Provider status could not be updated."
       )}`
     );
   }
 
-  redirect(
-    "/admin?success=provider-status-updated"
-  );
+  redirect("/admin?success=provider-status-updated");
 }
+
 
 export async function cancelBookingAction(
   formData: FormData

@@ -436,7 +436,7 @@ const averageRating =
     }));
   }
 
-  async function handleSaveProfile(formData: FormData) {
+    async function handleSaveProfile(formData: FormData) {
     const result = await saveProviderProfileAction({
       businessName: String(formData.get("businessName") ?? ""),
       service: String(formData.get("services") ?? ""),
@@ -444,6 +444,8 @@ const averageRating =
       contactEmail: String(formData.get("contactEmail") ?? ""),
       contactPhone: String(formData.get("contactPhone") ?? ""),
       bio: String(formData.get("bio") ?? ""),
+      yearsExperience: Number(formData.get("yearsExperience")),
+      mobileService: formData.get("mobileService") === "true",
     });
 
     if (!result.success) {
@@ -747,7 +749,42 @@ const averageRating =
             defaultValue={state.providerProfile?.bio ?? ""}
             placeholder="Short description of your workshop, turnaround time, or speciality"
           />
-              <button className="button-primary" type="submit" disabled={isPending}>
+
+          <label htmlFor="yearsExperience">
+            Years of experience
+          </label>
+          <input
+            id="yearsExperience"
+            name="yearsExperience"
+            type="number"
+            min="0"
+            max="60"
+            step="1"
+            defaultValue={state.providerProfile?.years_experience ?? ""}
+            placeholder="e.g. 5"
+            required
+          />
+
+          <label htmlFor="mobileService">
+            Do you offer mobile services?
+          </label>
+          <select
+            id="mobileService"
+            name="mobileService"
+            defaultValue={
+              state.providerProfile?.mobile_service == null
+                ? ""
+                : String(state.providerProfile.mobile_service)
+            }
+            required
+          >
+            <option value="" disabled>
+              Select an option
+            </option>
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+          </select>
+          <button className="button-primary" type="submit" disabled={isPending}>
       {isPending ? "Saving profile..." : "Save profile for admin review"}
     </button>
   </form>
