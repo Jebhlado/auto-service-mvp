@@ -183,8 +183,19 @@ if (user) {
     query = query.contains("services", [service]);
   }
 
-  const { data } = await query.order("updated_at", { ascending: false });
-  const providers = (data ?? []) as ProviderProfileRecord[];
+  const {
+  data: providerData,
+  error: providerQueryError,
+} = await query.order("updated_at", { ascending: false });
+
+if (providerQueryError) {
+  console.error("Customer provider directory query failed:", {
+    code: providerQueryError.code,
+    message: providerQueryError.message,
+  });
+}
+
+const providers = (providerData ?? []) as ProviderProfileRecord[];
 
   const { data: reviews } = user
   ? await supabase
@@ -692,7 +703,14 @@ customerBookings = bookingsWithAttachments;
 </form>
 
      <div className="section card-grid">
-  {providers?.length ? (
+  {providerQueryError ? (
+  <div className="card" role="alert">
+    <strong>We could not load service providers.</strong>
+    <p className="muted">
+      Please refresh the page. If the problem continues, contact support.
+    </p>
+  </div>
+) : providers.length ? (
     providers.map((provider) => {
 
   const providerReviews =
