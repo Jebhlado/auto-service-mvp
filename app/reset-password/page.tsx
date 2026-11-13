@@ -13,7 +13,6 @@ export default function ResetPasswordPage() {
 
   async function updatePassword() {
     setMessage("");
-    setIsSuccess(false);
 
     if (password.length < 8) {
       setMessage("Your password must contain at least 8 characters.");
@@ -41,10 +40,10 @@ export default function ResetPasswordPage() {
         return;
       }
 
-      setIsSuccess(true);
-      setMessage("Your password has been updated successfully.");
       setPassword("");
       setConfirmPassword("");
+      setIsSuccess(true);
+      setMessage("Your password has been updated successfully.");
     } catch {
       setMessage("Something went wrong. Please try again.");
     } finally {
@@ -57,64 +56,73 @@ export default function ResetPasswordPage() {
       <div className="auth-card">
         <h1>Reset your password</h1>
 
-        <p className="muted">
-          Choose a new password for your account.
-        </p>
-
-        <div className="stack-md">
-          <label htmlFor="new-password">New password</label>
-          <input
-            id="new-password"
-            type="password"
-            autoComplete="new-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            minLength={8}
-            required
-            disabled={isLoading || isSuccess}
-          />
-
-          <label htmlFor="confirm-password">
-            Confirm new password
-          </label>
-          <input
-            id="confirm-password"
-            type="password"
-            autoComplete="new-password"
-            value={confirmPassword}
-            onChange={(event) =>
-              setConfirmPassword(event.target.value)
-            }
-            minLength={8}
-            required
-            disabled={isLoading || isSuccess}
-          />
-
-          <button
-            className="button-primary"
-            type="button"
-            onClick={updatePassword}
-            disabled={isLoading || isSuccess}
-          >
-            {isLoading ? "Updating password..." : "Update password"}
-          </button>
-
-          {message && (
-            <p
-              role={isSuccess ? "status" : "alert"}
-              aria-live="polite"
-              className="muted"
-            >
+        {isSuccess ? (
+          <div className="stack-md">
+            <p role="status" aria-live="polite" className="muted">
               {message}
             </p>
-          )}
 
-          {isSuccess && (
             <a href="/auth" className="button-primary">
               Return to sign in
             </a>
-          )}
-        </div>
+          </div>
+        ) : (
+          <>
+            <p className="muted">
+              Choose a new password for your account.
+            </p>
+
+            <form
+              className="stack-md"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void updatePassword();
+              }}
+            >
+              <label htmlFor="new-password">New password</label>
+              <input
+                id="new-password"
+                type="password"
+                autoComplete="new-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                minLength={8}
+                required
+                disabled={isLoading}
+              />
+
+              <label htmlFor="confirm-password">
+                Confirm new password
+              </label>
+              <input
+                id="confirm-password"
+                type="password"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(event) =>
+                  setConfirmPassword(event.target.value)
+                }
+                minLength={8}
+                required
+                disabled={isLoading}
+              />
+
+              <button
+                className="button-primary"
+                type="submit"
+                disabled={isLoading}
+              >
+                {isLoading ? "Updating password..." : "Update password"}
+              </button>
+
+              {message && (
+                <p role="alert" aria-live="polite" className="muted">
+                  {message}
+                </p>
+              )}
+            </form>
+          </>
+        )}
       </div>
     </section>
   );
