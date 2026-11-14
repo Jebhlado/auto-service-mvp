@@ -37,6 +37,19 @@ export type ProviderProfileRecord = {
   } | null;
 };
 
+export type PublicProviderProfileRecord = {
+  user_id: string;
+  business_name: string;
+  services: string[];
+  location: string;
+  bio: string | null;
+  years_experience: string | null;
+  mobile_service: boolean | null;
+  approval_status: ApprovalStatus;
+  is_active: boolean;
+  updated_at: string;
+};
+
 export type BookingRecord = {
   id: string;
   customer_id: string;

@@ -8,7 +8,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatServices } from "@/lib/utils";
 import { getBookingAttachmentUrl } from "@/lib/attachments";
-import type { ProviderProfileRecord } from "@/lib/types";
+import type { PublicProviderProfileRecord } from "@/lib/types";
 import { PayFastCheckoutButton } from "@/components/customer/PayFastCheckoutButton";
 import { getPlatformSettings } from "@/lib/platform-settings";
 import { PaymentReturnRefresh } from "@/components/customer/PaymentReturnRefresh";
@@ -171,7 +171,18 @@ if (user) {
 
   let query = supabase
   .from("provider_profiles")
-  .select("*, profiles(full_name)")
+  .select(`
+  user_id,
+  business_name,
+  services,
+  location,
+  bio,
+  years_experience,
+  mobile_service,
+  approval_status,
+  is_active,
+  updated_at
+`)
   .eq("approval_status", "approved")
   .eq("is_active", true);
 
@@ -195,7 +206,7 @@ if (providerQueryError) {
   });
 }
 
-const providers = (providerData ?? []) as ProviderProfileRecord[];
+const providers = (providerData ?? []) as PublicProviderProfileRecord[];
 
   const { data: reviews } = user
   ? await supabase
@@ -756,7 +767,7 @@ customerBookings = bookingsWithAttachments;
           <span className="status-chip status-approved">{provider.approval_status}</span>
         </div>
         <p className="muted">
-          {provider.profiles?.full_name} - {provider.location || "Location coming soon"}
+          {provider.location || "Location coming soon"}
         </p>
         <p>{provider.bio || "General automotive service provider ready to take bookings."}</p>
         <div className="pill-list">
@@ -767,8 +778,6 @@ customerBookings = bookingsWithAttachments;
           ))}
         </div>
         <div className="stack-sm">
-          <span>Contact: {provider.contact_phone}</span>
-          <span>Email: {provider.contact_email}</span>
           <span>Services: {formatServices(provider.services)}</span>
         </div>
         <Link href={`/providers/${provider.user_id}`} className="button-primary">

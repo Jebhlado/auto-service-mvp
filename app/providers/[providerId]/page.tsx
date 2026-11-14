@@ -23,7 +23,17 @@ export default async function ProviderProfilePage({
 
   const { data: provider } = await supabase
   .from("provider_profiles")
-  .select("*, profiles(full_name)")
+  .select(`
+  user_id,
+  business_name,
+  services,
+  location,
+  bio,
+  years_experience,
+  mobile_service,
+  approval_status,
+  is_active
+`)
   .eq("user_id", providerId)
   .eq("approval_status", "approved")
   .eq("is_active", true)
@@ -95,17 +105,6 @@ const averageRating =
           </div>
 
           <div className="stack-sm">
-            <span>
-              Contact person: {provider.profiles?.full_name}
-            </span>
-
-            <span>
-              Phone: {provider.contact_phone}
-            </span>
-
-            <span>
-              Email: {provider.contact_email}
-            </span>
 
             <span>
               Services: {formatServices(provider.services)}
