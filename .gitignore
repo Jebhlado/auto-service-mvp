@@ -4,3 +4,10 @@ node_modules
 .env
 coverage
 dist
+
+# Local Supabase configuration - never commit
+/NEXT_PUBLIC_SUPABASE_URL
+/NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+# TypeScript build cache
+*.tsbuildinfo
