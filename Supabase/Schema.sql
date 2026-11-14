@@ -18,6 +18,7 @@ create table if not exists public.provider_profiles (
   contact_phone text not null,
   bio text,
   approval_status text not null default 'pending' check (approval_status in ('pending', 'approved', 'rejected')),
+  is_active boolean not null default false,
   approved_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -40,7 +41,7 @@ create table if not exists public.bookings (
   provider_id uuid not null references public.provider_profiles(user_id) on delete cascade,
   appointment_date date not null,
   issue_description text not null,
-  status text not null default 'pending' check (status in ('pending', 'confirmed', 'rejected')),
+  status text not null default 'pending' check (status in ('pending', 'confirmed', 'rejected', 'in_progress', 'completed', 'closed', 'cancelled')),
   created_at timestamptz not null default now()
 );
 
@@ -86,6 +87,81 @@ $$;
 
 revoke all on function public.is_admin(uuid) from public;
 grant execute on function public.is_admin(uuid) to authenticated, anon;
+
+-- Prevent users from assigning themselves privileged roles through direct
+-- PostgREST writes or profile upserts. Trusted server-side service-role
+-- operations may still manage roles; authenticated admins may manage roles.
+create or replace function public.guard_profile_role_changes()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- Service-role/server operations generally have no end-user auth.uid().
+  if auth.role() = 'service_role' or public.is_admin(auth.uid()) then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    if new.role not in ('customer', 'provider') then
+      raise exception 'Only a trusted administrator can assign this profile role'
+        using errcode = '42501';
+    end if;
+  elsif new.role is distinct from old.role then
+    raise exception 'Only a trusted administrator can change a profile role'
+      using errcode = '42501';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all on function public.guard_profile_role_changes() from public, anon, authenticated;
+
+drop trigger if exists profiles_guard_role_changes on public.profiles;
+create trigger profiles_guard_role_changes
+before insert or update on public.profiles
+for each row
+execute function public.guard_profile_role_changes();
+
+-- Provider-owned profile writes must never grant approval or activate a listing.
+create or replace function public.guard_provider_approval_changes()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.role() = 'service_role' or public.is_admin(auth.uid()) then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    -- Normalize user-created provider rows to the safe unapproved state.
+    -- This preserves signup while preventing approval/activation spoofing.
+    new.approval_status := 'pending';
+    new.is_active := false;
+    new.approved_at := null;
+  elsif new.approval_status is distinct from old.approval_status
+     or new.is_active is distinct from old.is_active
+     or new.approved_at is distinct from old.approved_at then
+    raise exception 'Only a trusted administrator can change provider approval'
+      using errcode = '42501';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all on function public.guard_provider_approval_changes() from public, anon, authenticated;
+
+drop trigger if exists provider_profiles_guard_approval on public.provider_profiles;
+create trigger provider_profiles_guard_approval
+before insert or update
+on public.provider_profiles
+for each row
+execute function public.guard_provider_approval_changes();
 
 drop policy if exists "profiles_select_own" on public.profiles;
 create policy "profiles_select_own"
