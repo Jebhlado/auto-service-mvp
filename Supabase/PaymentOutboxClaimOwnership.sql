@@ -1,13 +1,18 @@
--- Add claim ownership to the payment processing outbox.
--- Apply only after reviewing the live schema and testing in a non-production environment.
+
+-- Payment processing outbox claim ownership.
+-- Reconciled with the manually applied Supabase implementation.
 
 BEGIN;
 
 ALTER TABLE public.payment_processing_outbox
   ADD COLUMN IF NOT EXISTS claim_token uuid;
 
+CREATE INDEX IF NOT EXISTS payment_processing_outbox_claim_idx
+  ON public.payment_processing_outbox (available_at, created_at)
+  WHERE status IN ('pending', 'processing');
+
 CREATE OR REPLACE FUNCTION public.claim_payment_processing_outbox(
-  p_payment_id uuid DEFAULT NULL::uuid
+  p_payment_id uuid DEFAULT NULL
 )
 RETURNS SETOF public.payment_processing_outbox
 LANGUAGE plpgsql
@@ -37,7 +42,7 @@ BEGIN
   UPDATE public.payment_processing_outbox AS o
   SET status = 'processing',
       attempts = o.attempts + 1,
-      locked_until = now() + interval '2 minutes',
+      locked_until = now() + interval '10 minutes',
       claim_token = gen_random_uuid(),
       last_error = NULL
   FROM candidate
@@ -46,8 +51,6 @@ BEGIN
 END;
 $function$;
 
--- Complete only while the caller still owns a live claim. The lease check
--- uses the database clock and is atomic with the update.
 CREATE OR REPLACE FUNCTION public.complete_payment_processing_outbox(
   p_outbox_id uuid,
   p_claim_token uuid
@@ -66,15 +69,12 @@ BEGIN
       last_error = NULL
   WHERE id = p_outbox_id
     AND status = 'processing'
-    AND claim_token = p_claim_token
-    AND locked_until > now();
+    AND claim_token = p_claim_token;
 
   RETURN FOUND;
 END;
 $function$;
 
--- Reschedule only while the caller still owns a live claim. The lease check
--- uses the database clock and is atomic with the update.
 CREATE OR REPLACE FUNCTION public.retry_payment_processing_outbox(
   p_outbox_id uuid,
   p_claim_token uuid,
@@ -95,8 +95,7 @@ BEGIN
       last_error = left(p_last_error, 2000)
   WHERE id = p_outbox_id
     AND status = 'processing'
-    AND claim_token = p_claim_token
-    AND locked_until > now();
+    AND claim_token = p_claim_token;
 
   RETURN FOUND;
 END;
@@ -105,6 +104,7 @@ $function$;
 REVOKE ALL ON FUNCTION
   public.claim_payment_processing_outbox(uuid)
   FROM PUBLIC, anon, authenticated;
+
 GRANT EXECUTE ON FUNCTION
   public.claim_payment_processing_outbox(uuid)
   TO service_role;
@@ -112,6 +112,7 @@ GRANT EXECUTE ON FUNCTION
 REVOKE ALL ON FUNCTION
   public.complete_payment_processing_outbox(uuid, uuid)
   FROM PUBLIC, anon, authenticated;
+
 GRANT EXECUTE ON FUNCTION
   public.complete_payment_processing_outbox(uuid, uuid)
   TO service_role;
@@ -119,11 +120,11 @@ GRANT EXECUTE ON FUNCTION
 REVOKE ALL ON FUNCTION
   public.retry_payment_processing_outbox(uuid, uuid, timestamptz, text)
   FROM PUBLIC, anon, authenticated;
+
 GRANT EXECUTE ON FUNCTION
   public.retry_payment_processing_outbox(uuid, uuid, timestamptz, text)
   TO service_role;
 
--- Ensure PostgREST refreshes the changed composite return type and new RPCs.
 NOTIFY pgrst, 'reload schema';
 
 COMMIT;
