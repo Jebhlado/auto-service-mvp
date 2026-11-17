@@ -22,7 +22,7 @@ export default async function ProviderProfilePage({
   const supabase = await createClient();
 
   const { data: provider } = await supabase
-  .from("provider_profiles")
+  .from("public_provider_directory")
   .select(`
   user_id,
   business_name,
@@ -30,13 +30,9 @@ export default async function ProviderProfilePage({
   location,
   bio,
   years_experience,
-  mobile_service,
-  approval_status,
-  is_active
+  mobile_service
 `)
   .eq("user_id", providerId)
-  .eq("approval_status", "approved")
-  .eq("is_active", true)
   .single();
 
   if (!provider) {
