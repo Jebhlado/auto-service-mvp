@@ -160,10 +160,8 @@ export function ProviderDashboardClient({ serviceCategories }: { serviceCategori
 }
 
   const { data: providerProfile } = await supabase
-    .from("provider_profiles")
-    .select("*")
-    .eq("user_id", user.id)
-    .single<ProviderProfileRecord>();
+    .rpc("get_my_provider_profile")
+    .maybeSingle<ProviderProfileRecord>();
 
   const { data: paymentAccount } = await supabase
   .from("provider_payment_accounts")
