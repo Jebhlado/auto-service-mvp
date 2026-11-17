@@ -45,8 +45,6 @@ export type PublicProviderProfileRecord = {
   bio: string | null;
   years_experience: string | null;
   mobile_service: boolean | null;
-  approval_status: ApprovalStatus;
-  is_active: boolean;
   updated_at: string;
 };
 
