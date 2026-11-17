@@ -760,7 +760,6 @@ customerBookings = bookingsWithAttachments;
   <p>No reviews yet</p>
 )}
           </div>
-          <span className="status-chip status-approved">{provider.approval_status}</span>
         </div>
         <p className="muted">
           {provider.location || "Location coming soon"}
