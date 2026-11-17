@@ -150,7 +150,6 @@ if (user) {
       provider:provider_profiles(
         business_name,
         location,
-        contact_phone
       ),
       payment:payments(
         id,
@@ -170,7 +169,7 @@ if (user) {
 }
 
   let query = supabase
-  .from("provider_profiles")
+  .from("public_provider_directory")
   .select(`
   user_id,
   business_name,
@@ -179,12 +178,9 @@ if (user) {
   bio,
   years_experience,
   mobile_service,
-  approval_status,
-  is_active,
   updated_at
 `)
-  .eq("approval_status", "approved")
-  .eq("is_active", true);
+;
 
   if (location) {
     query = query.ilike("location", `%${location}%`);
