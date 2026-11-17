@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { escapeNotificationHtml, sendNotification } from "@/lib/notifications";
 import { createNotification } from "@/lib/create-notification";
 
@@ -20,6 +21,18 @@ export async function createBookingAction(formData: FormData) {
   const attachment = formData.get("attachment") as File | null;
 
   const supabase = await createClient();
+
+  // Resolve the provider through the public, approved-and-active directory
+  // before accepting a booking. Never trust a client-supplied provider ID alone.
+  const { data: eligibleProvider } = await supabase
+    .from("public_provider_directory")
+    .select("user_id")
+    .eq("user_id", providerId)
+    .maybeSingle();
+
+  if (!eligibleProvider) {
+    redirect(`/customer?error=provider-unavailable`);
+  }
 
   let attachmentUrl: string | null = null;
 
@@ -95,11 +108,14 @@ export async function createBookingAction(formData: FormData) {
     "booking_updates"
   );
 
-  const { data: provider } = await supabase
+  // Private provider contact data is retrieved only on the server after a
+  // valid customer booking has been created.
+  const adminClient = createAdminClient();
+  const { data: provider } = await adminClient
     .from("provider_profiles")
     .select("business_name, contact_email")
     .eq("user_id", providerId)
-    .single();
+    .maybeSingle();
 
   if (provider?.contact_email) {
     await sendNotification({
