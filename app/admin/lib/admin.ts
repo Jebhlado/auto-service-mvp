@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { requireRole } from "@/lib/auth";
 import type {
   BookingRecord,
   ProfileRecord,
@@ -10,7 +12,8 @@ import type {
  */
 
 export async function getPendingProviders() {
-  const supabase = await createClient();
+  await requireRole(["admin"]);
+  const supabase = createAdminClient();
 
   const { data } = await supabase
     .from("provider_profiles")
@@ -25,7 +28,8 @@ export async function getPendingProviders() {
 }
 
 export async function getProviders(search = "") {
-  const supabase = await createClient();
+  await requireRole(["admin"]);
+  const supabase = createAdminClient();
 
   let query = supabase
     .from("provider_profiles")
