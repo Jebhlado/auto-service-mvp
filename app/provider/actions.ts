@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformSettings } from "@/lib/platform-settings";
 import { createNotification } from "@/lib/create-notification";
 import {
@@ -126,6 +127,16 @@ export async function createBookingAction(formData: FormData) {
 
   const supabase = await createClient();
 
+  const { data: eligibleProvider } = await supabase
+    .from("public_provider_directory")
+    .select("user_id")
+    .eq("user_id", providerId)
+    .maybeSingle();
+
+  if (!eligibleProvider) {
+    redirect("/customer?error=provider-unavailable");
+  }
+
   let attachmentUrl: string | null = null;
 
   if (attachment && attachment.size > 0) {
@@ -193,11 +204,12 @@ export async function createBookingAction(formData: FormData) {
     );
   }
 
-  const { data: provider } = await supabase
+  const adminClient = createAdminClient();
+  const { data: provider } = await adminClient
     .from("provider_profiles")
     .select("business_name, contact_email")
     .eq("user_id", providerId)
-    .single();
+    .maybeSingle();
 
   await createNotification(
     providerId,
