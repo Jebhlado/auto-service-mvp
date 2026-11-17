@@ -63,8 +63,6 @@ grant select (
   bio,
   years_experience,
   mobile_service,
-  approval_status,
-  is_active,
   created_at,
   updated_at
 ) on table public.provider_profiles to authenticated;
