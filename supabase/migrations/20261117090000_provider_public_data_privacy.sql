@@ -1,9 +1,11 @@
 -- Provider public/private data boundary.
--- Public directory access is through a deliberately limited view. Private contact
--- details are available to the provider owner through a current-user-only RPC and
--- to trusted server-side admin operations using the service role.
+-- Public directory access is through a limited view.
+-- Private contact details are available to the provider owner
+-- through a current-user-only RPC and trusted server-side operations.
+
 begin;
 
+-- Verify the required table exists.
 do $$
 begin
   if to_regclass('public.provider_profiles') is null then
@@ -12,6 +14,14 @@ begin
 end;
 $$;
 
+-- Align the repository schema with the existing live database.
+alter table public.provider_profiles
+  add column if not exists years_experience text;
+
+alter table public.provider_profiles
+  add column if not exists mobile_service boolean;
+
+-- Create the restricted public directory.
 create or replace view public.public_provider_directory
 with (security_barrier = true, security_invoker = false)
 as
@@ -28,14 +38,28 @@ from public.provider_profiles
 where approval_status = 'approved'
   and is_active = true;
 
-revoke all on table public.public_provider_directory from public, anon, authenticated;
-grant select on table public.public_provider_directory to anon, authenticated;
+-- The view must have a trusted owner.
+alter view public.public_provider_directory owner to postgres;
 
--- Remove broad table-level SELECT and any column-level SELECT grants from the
--- public API roles. The view is the only anonymous directory surface.
-revoke all privileges on table public.provider_profiles from anon;
-revoke select on table public.provider_profiles from authenticated;
+-- Only expose the public directory to API roles.
+revoke all privileges
+on table public.public_provider_directory
+from PUBLIC, anon, authenticated;
 
+grant select
+on table public.public_provider_directory
+to anon, authenticated;
+
+-- Remove broad table-level permissions.
+revoke all privileges
+on table public.provider_profiles
+from PUBLIC, anon;
+
+revoke select
+on table public.provider_profiles
+from authenticated;
+
+-- Remove column-level SELECT permissions, including inherited PUBLIC grants.
 revoke select (
   user_id,
   business_name,
@@ -51,10 +75,11 @@ revoke select (
   updated_at,
   years_experience,
   mobile_service
-) on table public.provider_profiles from anon, authenticated;
+)
+on table public.provider_profiles
+from PUBLIC, anon, authenticated;
 
--- Authenticated users may read public profile attributes on rows allowed by RLS.
--- Private contact fields and approval timestamps are deliberately excluded.
+-- Restore only approved public metadata access for authenticated users.
 grant select (
   user_id,
   business_name,
@@ -65,8 +90,11 @@ grant select (
   mobile_service,
   created_at,
   updated_at
-) on table public.provider_profiles to authenticated;
+)
+on table public.provider_profiles
+to authenticated;
 
+-- A provider can retrieve only their own complete profile.
 create or replace function public.get_my_provider_profile()
 returns setof public.provider_profiles
 language sql
@@ -79,7 +107,14 @@ as $$
   where p.user_id = auth.uid();
 $$;
 
-revoke all on function public.get_my_provider_profile() from public, anon;
-grant execute on function public.get_my_provider_profile() to authenticated;
+alter function public.get_my_provider_profile() owner to postgres;
+
+revoke all
+on function public.get_my_provider_profile()
+from PUBLIC, anon;
+
+grant execute
+on function public.get_my_provider_profile()
+to authenticated;
 
 commit;

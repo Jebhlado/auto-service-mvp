@@ -233,10 +233,6 @@ export async function createBookingAction(formData: FormData) {
   redirect("/customer?success=booking-created");
 }
 
-export async function testProviderAction() {
-  console.log("Provider action works");
-}
-
 export async function updateBookingStatusAction(
   formData: FormData
 ) {

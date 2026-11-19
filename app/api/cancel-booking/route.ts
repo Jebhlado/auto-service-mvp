@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { sendNotification } from "@/lib/notifications";
 import { createNotification } from "@/lib/create-notification";
 import { redirect } from "next/navigation";
@@ -24,21 +25,12 @@ export async function POST(request: Request) {
   }
 
   const { data: booking } = await supabase
-    .from("bookings")
-    .select(`
-      id,
-      customer_id,
-      provider_id,
-      status,
-      provider:provider_profiles (
-        contact_email,
-        business_name
-      )
-    `)
-    .eq("id", bookingId)
-    .eq("customer_id", user.id)
-    .in("status", ["pending", "confirmed"])
-    .single();
+  .from("bookings")
+  .select("id, customer_id, provider_id, status")
+  .eq("id", bookingId)
+  .eq("customer_id", user.id)
+  .in("status", ["pending", "confirmed"])
+  .single();
 
   if (!booking) {
     redirect("/customer?error=booking-cannot-be-cancelled");
@@ -61,10 +53,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const provider = Array.isArray(booking.provider)
-    ? booking.provider[0]
-    : booking.provider;
-
   await createNotification(
     booking.provider_id,
     "Booking cancelled",
@@ -72,14 +60,22 @@ export async function POST(request: Request) {
     "booking_updates"
   );
 
-  if (provider?.contact_email) {
-    await sendNotification({
-      to: provider.contact_email,
-      subject: "Booking cancelled",
-      html: `<p>A customer has cancelled their appointment.</p>`,
-      text: "A customer cancelled their appointment."
-    }, "booking_updates");
-  }
+  const adminClient = createAdminClient();
+
+const { data: provider } = await adminClient
+  .from("provider_profiles")
+  .select("contact_email")
+  .eq("user_id", booking.provider_id)
+  .maybeSingle();
+
+if (provider?.contact_email) {
+  await sendNotification({
+    to: provider.contact_email,
+    subject: "Booking cancelled",
+    html: "<p>A customer has cancelled their appointment.</p>",
+    text: "A customer cancelled their appointment."
+  }, "booking_updates");
+}
 
   redirect("/customer?success=booking-cancelled");
 }

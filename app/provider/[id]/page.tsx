@@ -21,24 +21,25 @@ export default async function ProviderPage({
   }
 
   // ✅ NOW SAFE TO FETCH BOOKINGS
-  const { data: bookingData } = await supabase
-    .from("bookings")
-    .select(`
-      id,
-      appointment_date,
-      issue_description,
-      status,
-      provider_id,
-      provider:provider_profiles (
-        business_name,
-        location,
-        contact_email
-      )
-    `)
-    .eq("customer_id", user.id)
-    .order("created_at", { ascending: false });
+const { data: bookingData } = await supabase
+  .from("bookings")
+  .select(`
+    id,
+    appointment_date,
+    issue_description,
+    status,
+    provider_id,
+    provider:provider_profiles (
+      business_name,
+      location
+    )
+  `)
+  .eq("customer_id", user.id)
+  .eq("provider_id", id)
+  .order("created_at", { ascending: false });
 
-  const bookings = bookingData ?? [];
+const bookings = bookingData ?? [];
+
 
   // 👉 you can now use bookings below in your UI
 

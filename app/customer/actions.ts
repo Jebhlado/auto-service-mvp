@@ -1,12 +1,14 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { approveQuoteAndCreatePayment } from "@/lib/payments";
 import { createPayfastCheckout } from "@/lib/payfast/checkout";
 import { sendNotification } from "@/lib/notifications";
 import { createNotification } from "@/lib/create-notification";
+
 
 export async function updateQuoteStatus(
   formData: FormData
@@ -86,11 +88,13 @@ export async function updateQuoteStatus(
       `quote-declined:${bookingId}:provider`
     );
 
-    const { data: provider } = await supabase
-      .from("provider_profiles")
-      .select("contact_email")
-      .eq("user_id", booking.provider_id)
-      .maybeSingle();
+    const adminClient = createAdminClient();
+
+    const { data: provider } = await adminClient
+    .from("provider_profiles")
+    .select("contact_email")
+    .eq("user_id", booking.provider_id)
+    .maybeSingle();
 
     if (provider?.contact_email) {
       await sendNotification({
@@ -132,11 +136,22 @@ export async function updateQuoteStatus(
     `quote-approved:${bookingId}:provider`
   );
 
-  const { data: provider } = await supabase
+const adminClient = createAdminClient();
+
+const { data: provider, error: providerError } =
+  await adminClient
     .from("provider_profiles")
     .select("contact_email")
     .eq("user_id", booking.provider_id)
     .maybeSingle();
+
+if (providerError) {
+  console.error(
+    "Failed to retrieve provider email for quote approval notification:",
+    providerError.message
+  );
+}
+
 
   if (provider?.contact_email) {
     await sendNotification({
@@ -369,11 +384,21 @@ export async function createReview(
     `review-created:${bookingId}:provider`
   );
 
-  const { data: providerProfile } = await supabase
+  const adminClient = createAdminClient();
+
+const { data: providerProfile, error: providerError } =
+  await adminClient
     .from("provider_profiles")
     .select("contact_email")
     .eq("user_id", booking.provider_id)
     .maybeSingle();
+
+if (providerError) {
+  console.error(
+    "Failed to retrieve provider email for review notification:",
+    providerError.message
+  );
+}
 
   if (providerProfile?.contact_email) {
     const escapedReview = reviewText

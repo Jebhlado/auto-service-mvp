@@ -8,7 +8,10 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatServices } from "@/lib/utils";
 import { getBookingAttachmentUrl } from "@/lib/attachments";
-import type { PublicProviderProfileRecord } from "@/lib/types";
+import type {
+  PublicProviderProfileRecord,
+  BookingStatus,
+} from "@/lib/types";
 import { PayFastCheckoutButton } from "@/components/customer/PayFastCheckoutButton";
 import { getPlatformSettings } from "@/lib/platform-settings";
 import { PaymentReturnRefresh } from "@/components/customer/PaymentReturnRefresh";
@@ -23,6 +26,45 @@ type CustomerPageProps = {
     booking?: string;
     error?: string;
   }>;
+};
+
+// Add the CustomerBooking type here
+type CustomerBooking = {
+  id: string;
+  customer_id: string;
+  provider_id: string;
+  appointment_date: string;
+  issue_description: string;
+  status: BookingStatus;
+  created_at: string;
+
+  service_preference: string | null;
+  attachment_url: string | null;
+  attachmentUrl?: string | null;
+
+  provider_notes: string | null;
+
+  quote_status: string | null;
+  quote_service_price: number | null;
+  quote_callout_fee: number | null;
+  quote_total: number | null;
+  quote_estimated_time: string | null;
+  quote_warranty: string | null;
+  quote_notes: string | null;
+
+  provider: {
+    business_name: string;
+    location: string;
+  } | null;
+
+  payment: {
+    id: string;
+    amount: number;
+    currency: string;
+    status: string;
+    refunded_amount: number | null;
+    payfast_reference: string | null;
+  } | null;
 };
 
 function getBookingLifecycle(
@@ -140,16 +182,16 @@ export default async function CustomerPage({ searchParams }: CustomerPageProps) 
   }
 } = await supabase.auth.getUser();
 
-let customerBookings = [];
+let customerBookings: CustomerBooking[] = [];
 
 if (user) {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("bookings")
     .select(`
       *,
       provider:provider_profiles(
         business_name,
-        location,
+        location
       ),
       payment:payments(
         id,
@@ -165,7 +207,14 @@ if (user) {
       ascending: false
     });
 
-  customerBookings = data ?? [];
+  if (error) {
+    console.error("Customer bookings query failed:", {
+      code: error.code,
+      message: error.message
+    });
+  }
+
+  customerBookings = (data ?? []) as CustomerBooking[];
 }
 
   let query = supabase
