@@ -137,11 +137,11 @@ This register captures owner decisions recorded in project conversations. It doe
 | OPS-011 | Comprehensive audit logs for important user/admin/system actions, with actor/role/action/record/time/old-new values/reason/source/correlation/success-failure as appropriate. Separate business audit, security and application/system logs; restrict and protect from tampering. Never log passwords, tokens, card credentials or unnecessary personal data. | Approved |
 | OPS-012 | Business continuity and disaster recovery are required; verify backups through actual restore drills. | Approved |
 
-## 7. Security questionnaire — 15 approved; 10 not yet answered
+## 7. Security decisions — 25 approved
 
-Questions SEC-001 through SEC-015 (Batches 1–3) were explicitly approved. Batch 4 (SEC-016–020) had been presented but was awaiting the owner's answers. Batch 5 (SEC-021–025) had not yet been asked. The proposed topics below are not owner-approved decisions and must not be treated as requirements until answered.
+All 25 security questionnaire decisions were explicitly approved by the owner across five batches. Questions 16–20 were approved together (yes to all five); questions 21–25 were also approved. The requirements are:
 
-| ID | Requirement/topic discussed | Owner status |
+| ID | Approved requirement |
 |---|---|
 | SEC-001 | Email verification for customers/providers before account use. |
 | SEC-002 | Detect repeated failed logins; rate limits, progressive delays, suspicious-IP detection and security notifications. |
