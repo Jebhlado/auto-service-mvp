@@ -62,7 +62,7 @@ This is a governance tracker, not a claim that the application is production-rea
 
 ## 3. Security work
 
-Owner approved 25 security requirements. Security assessment and third-party assessment are already underway according to the owner. The active approach includes deliberate attempts to break/bypass the application in a controlled test environment.
+Owner approved 15 security requirements across Batches 1–3. Batch 4 (questions 16–20) was awaiting answers; Batch 5 (questions 21–25) had not yet been asked at the time of this register correction. Security assessment and third-party assessment are already underway according to the owner. The active approach includes deliberate attempts to break/bypass the application in a controlled test environment.
 
 | Workstream | Status | Evidence required |
 |---|---|---|
@@ -74,14 +74,14 @@ Owner approved 25 security requirements. Security assessment and third-party ass
 | Upload validation/malware scanning | Approved — not verified | File signature/size/type/quarantine/scan tests |
 | Payment fraud/idempotency | In progress | Duplicate, mismatch, replay and concurrent-worker tests |
 | Admin audit logging | Approved — not verified | Read/download/action audit evidence |
-| WAF/DDoS and browser headers | Approved — not verified | Vercel/Cloudflare configuration and header tests |
-| CSRF/origin/CORS | Approved — not verified | Negative cross-origin and CSRF tests |
-| Database/network restrictions | Approved — not verified | Privilege and network configuration review |
-| CI/CD security checks | Approved — not verified | Pipeline evidence; critical findings block deployment |
-| Incident response | Approved — not verified | Documented exercise/tabletop evidence |
-| Independent penetration test | Approved; active testing underway | Findings, severity, remediation and retest report |
+| WAF/DDoS and browser headers | Awaiting questionnaire answer / verification | Vercel/Cloudflare configuration and header tests |
+| CSRF/origin/CORS | Awaiting questionnaire answer / verification | Negative cross-origin and CSRF tests |
+| Database/network restrictions | Awaiting questionnaire answer / verification | Privilege and network configuration review |
+| CI/CD security checks | Awaiting questionnaire answer / verification | Pipeline evidence; critical findings block deployment |
+| Incident response | Awaiting questionnaire answer / verification | Documented exercise/tabletop evidence |
+| Independent penetration test | Awaiting questionnaire answer / verification | Findings, severity, remediation and retest report |
 | Supplier assessments | In progress | PayFast, Supabase, Vercel, email, storage, WhatsApp |
-| Responsible disclosure | Approved — not verified | Public security contact and policy |
+| Responsible disclosure | Awaiting questionnaire answer / verification | Public security contact and policy |
 
 ## 4. Launch readiness gates
 
