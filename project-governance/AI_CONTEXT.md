@@ -77,7 +77,7 @@ Before adding a feature:
 
 The owner explicitly wants active security testing that attempts to break/bypass the application. This work is underway. Test only systems and accounts under authorised control. Prefer staging and synthetic test data; never run destructive tests against production customer records or real payments without separate explicit safeguards and approval.
 
-Owner-approved security controls currently cover SEC-001 through SEC-015 only (Batches 1–3). Batch 4 (SEC-016–020) is awaiting the owner's answers; Batch 5 (SEC-021–025) has not yet been asked. Proposed items in the decision register are not approved controls. Approved controls are requirements, not proof of implementation. Map each approved control to code/configuration and test evidence.
+Owner-approved security controls cover SEC-001 through SEC-025. All five batches were answered and approved by the owner. The controls are requirements, not proof of implementation. Map each approved control to code/configuration and test evidence.
 
 Known high-priority areas from prior audit:
 - broad booking table grants/updates;
@@ -134,4 +134,4 @@ Maintain the documentation list in DECISIONS.md. The owner expects a professiona
 
 ## Current focus
 
-Security owner questionnaire is partially complete: 15 questions approved across Batches 1–3. Batch 4 (questions 16–20) was the next step and is awaiting the owner's answers; Batch 5 (questions 21–25) has not yet been asked. Resume at Batch 4, keep the five-question batch format, and update the decision register immediately after each answer. After the questionnaire is complete, audit the approved controls against the existing application and carry out controlled bypass testing/remediation.
+Security owner questionnaire is complete: 25/25 approved across five batches. The next action is a structured security implementation audit against the existing application, followed by controlled bypass testing and remediation. Do not repeat the questionnaire; update the decision register as technical evidence and findings change.
